@@ -199,7 +199,12 @@ def generate_qr(item_id: int):
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-@app.post("/users/")
+@app.post("/users/",
+    status_code=status.HTTP_201_CREATED,
+    response_model=UserRead,
+    tags=["Użytkownicy"],
+    summary="Utwórz użytkownika [administrator]"
+)
 async def create_user(
     user: UserCreate,
     db: Session = Depends(get_db),
