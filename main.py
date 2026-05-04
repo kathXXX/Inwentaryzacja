@@ -162,9 +162,25 @@ def get_current_user(
         raise HTTPException(status_code=401, detail="Użytkownik nie istnieje")
 
     return user
+def require_admin(current_user: models.User = Depends(get_current_user)):
+    if current_user.role != UserRole.administrator:
+        raise HTTPException(status_code=403, detail="Wymagana rola administrator")
+    return current_user
+
+
+def require_teacher(current_user: models.User = Depends(get_current_user)):
+    if current_user.role not in [UserRole.nauczyciel, UserRole.administrator]:
+        raise HTTPException(status_code=403, detail="Wymagana rola nauczyciel")
+    return current_user
+
+
+def require_student(current_user: models.User = Depends(get_current_user)):
+    if current_user.role != UserRole.student:
+        raise HTTPException(status_code=403, detail="Wymagana rola student")
+    return current_user
 
 @app.get("/loans/pending/", response_model=list[LoanRead], tags=["Wypożyczenia"], summary="Lista oczekujących wniosków")
-async def list_pending_loans(db: db_dependency):
+async def list_pending_loans(db: db_dependency, current_user: models.User = Depends(require_teacher)):
     return db.query(models.Loan).filter(models.Loan.status == ItemStatus.zarezerwowany).all()
 
 @app.get("/items/{item_id}/qr")
@@ -181,7 +197,7 @@ def generate_qr(item_id: int):
 
 @app.post("/users/", status_code=status.HTTP_201_CREATED, response_model=UserRead,
           tags=["Użytkownicy"], summary="Utwórz użytkownika [administrator]")
-async def create_user(user: UserCreate, db: db_dependency):
+async def create_user(user: UserCreate, db: db_dependency, current_user: models.User = Depends(require_admin)):
     existing = db.query(models.User).filter(models.User.username == user.username).first()
     if existing:
         raise HTTPException(status_code=400, detail="Użytkownik o tej nazwie już istnieje")
@@ -195,8 +211,9 @@ async def create_user(user: UserCreate, db: db_dependency):
 @app.get("/users/", response_model=list[UserRead],
          tags=["Użytkownicy"], summary="Lista użytkowników [administrator]")
 async def list_users(
+
     db: db_dependency,
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(require_admin)
 ):
     if current_user.role != UserRole.administrator:
         raise HTTPException(status_code=403, detail="Brak dostępu")
@@ -205,7 +222,7 @@ async def list_users(
 
 @app.get("/users/{user_id}", response_model=UserRead,
          tags=["Użytkownicy"], summary="Pobierz użytkownika [administrator]")
-async def read_user(user_id: int, db: db_dependency):
+async def read_user(user_id: int, db: db_dependency, current_user: models.User = Depends(require_admin)):
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Użytkownik nie znaleziony")
@@ -213,7 +230,7 @@ async def read_user(user_id: int, db: db_dependency):
 
 @app.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT,
             tags=["Użytkownicy"], summary="Usuń użytkownika [administrator]")
-async def delete_user(user_id: int, db: db_dependency):
+async def delete_user(user_id: int, db: db_dependency, current_user: models.User = Depends(require_admin)):
     db_user = db.query(models.User).filter(models.User.id == user_id).first()
     if not db_user:
         raise HTTPException(status_code=404, detail="Użytkownik nie znaleziony")
@@ -226,7 +243,7 @@ async def delete_user(user_id: int, db: db_dependency):
 
 @app.post("/items/", status_code=status.HTTP_201_CREATED, response_model=ItemRead,
           tags=["Przedmioty"], summary="Dodaj przedmiot [administrator]")
-async def create_item(item: ItemCreate, db: db_dependency):
+async def create_item(item: ItemCreate, db: db_dependency, current_user: models.User = Depends(require_admin)):
     db_item = models.Item(**item.model_dump())
     db.add(db_item)
     db.commit()
@@ -252,7 +269,7 @@ async def read_item(item_id: int, db: db_dependency):
 
 @app.delete("/items/{item_id}", status_code=status.HTTP_204_NO_CONTENT,
             tags=["Przedmioty"], summary="Usuń przedmiot [administrator]")
-async def delete_item(item_id: int, db: db_dependency):
+async def delete_item(item_id: int, db: db_dependency, current_user: models.User = Depends(require_admin)):
     db_item = db.query(models.Item).filter(models.Item.id == item_id).first()
     if not db_item:
         raise HTTPException(status_code=404, detail="Przedmiot nie znaleziony")
@@ -294,7 +311,7 @@ async def list_availability(db: db_dependency):
 
 @app.post("/loans/request/", status_code=status.HTTP_201_CREATED, response_model=LoanRead,
           tags=["Wypożyczenia"], summary="Złóż wniosek o wypożyczenie [student]")
-async def request_loan(req: LoanRequest, db: db_dependency):
+async def request_loan(req: LoanRequest, db: db_dependency, current_user: models.User = Depends(require_student)):
     """Student rezerwuje przedmiot — status zmienia się na 'zarezerwowany'."""
     loan = db.query(models.Loan).filter(models.Loan.item_id == req.item_id).first()
     if not loan:
@@ -309,7 +326,7 @@ async def request_loan(req: LoanRequest, db: db_dependency):
 
 @app.post("/loans/approve/", response_model=LoanRead,
           tags=["Wypożyczenia"], summary="Zatwierdź wniosek studenta [nauczyciel]")
-async def approve_loan(req: LoanApprove, db: db_dependency):
+async def approve_loan(req: LoanApprove, db: db_dependency, current_user: models.User = Depends(require_teacher)):
     """Nauczyciel zatwierdza rezerwację — status zmienia się na 'wypozyczony'."""
     loan = db.query(models.Loan).filter(models.Loan.id == req.loan_id).first()
     if not loan:
@@ -323,7 +340,7 @@ async def approve_loan(req: LoanApprove, db: db_dependency):
 
 @app.post("/loans/teacher/", status_code=status.HTTP_201_CREATED, response_model=LoanRead,
           tags=["Wypożyczenia"], summary="Wypożycz sprzęt (nauczyciel, bez autoryzacji) [nauczyciel]")
-async def teacher_loan(req: TeacherLoan, db: db_dependency):
+async def teacher_loan(req: TeacherLoan, db: db_dependency,current_user: models.User = Depends(require_teacher)):
     """Nauczyciel wypożycza przedmiot bezpośrednio — pomija etap rezerwacji."""
     loan = db.query(models.Loan).filter(models.Loan.item_id == req.item_id).first()
     if not loan:
@@ -338,7 +355,7 @@ async def teacher_loan(req: TeacherLoan, db: db_dependency):
 
 @app.post("/loans/return/", response_model=LoanRead,
           tags=["Wypożyczenia"], summary="Oznacz przedmiot jako zwrócony [nauczyciel]")
-async def return_loan(req: LoanReturn, db: db_dependency):
+async def return_loan(req: LoanReturn, db: db_dependency, current_user: models.User = Depends(require_teacher)):
     """Nauczyciel oznacza przedmiot jako zwrócony — status wraca do 'dostepny'."""
     loan = db.query(models.Loan).filter(models.Loan.id == req.loan_id).first()
     if not loan:
