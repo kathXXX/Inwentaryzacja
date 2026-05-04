@@ -14,6 +14,7 @@ from passlib.context import CryptContext
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from passlib.context import CryptContext
 
 app = FastAPI()
 security = HTTPBearer()
@@ -195,18 +196,35 @@ def generate_qr(item_id: int):
 
     return StreamingResponse(buf, media_type="image/png")
 
-@app.post("/users/", status_code=status.HTTP_201_CREATED, response_model=UserRead,
-          tags=["Użytkownicy"], summary="Utwórz użytkownika [administrator]")
-async def create_user(user: UserCreate, db: db_dependency):
-    existing = db.query(models.User).filter(models.User.username == user.username).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Użytkownik o tej nazwie już istnieje")
-    # UWAGA: w produkcji użyj bcrypt do hashowania hasła
-    db_user = models.User(username=user.username, password=hash_password(user.password), role=user.role)
-    db.add(db_user)
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+@app.post("/users/")
+async def create_user(
+    user: UserCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_admin)
+):
+    hashed_password = pwd_context.hash(user.password)
+
+    new_user = models.User(
+        username=user.username,
+        hashed_password=hashed_password,
+        role=user.role
+    )
+
+    db.add(new_user)
     db.commit()
-    db.refresh(db_user)
-    return db_user
+    db.refresh(new_user)
+
+    return new_user
+
+def hash_password(password: str):
+    return pwd_context.hash(password)
+
+
+def verify_password(plain_password: str, hashed_password: str):
+    return pwd_context.verify(plain_password, hashed_password)
 
 @app.get("/users/", response_model=list[UserRead],
          tags=["Użytkownicy"], summary="Lista użytkowników [administrator]")
