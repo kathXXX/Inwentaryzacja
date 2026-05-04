@@ -73,7 +73,7 @@ def verify_password(plain, hashed):
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # na dev OK
+    allow_origins=["https://web-production-53ca6.up.railway.app"]
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
