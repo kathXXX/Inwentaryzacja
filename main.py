@@ -208,7 +208,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 async def create_user(
     user: UserCreate,
     db: Session = Depends(get_db),
-    #current_user: models.User = Depends(require_admin)
+    current_user: models.User = Depends(require_admin)
 ):
     hashed_password = pwd_context.hash(user.password)
 
