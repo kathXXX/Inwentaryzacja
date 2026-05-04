@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from passlib.context import CryptContext
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
 
 app = FastAPI()
 security = HTTPBearer()
@@ -85,8 +86,8 @@ models.Base.metadata.create_all(bind=engine)
 # ---------------------------------------------------------------------------
 
 class UserCreate(BaseModel):
-    username: str
-    password: str
+    username: str = Field(min_length=3, max_length=50)
+    password: str = Field(min_length=8, max_length=128)
     role: UserRole = UserRole.student
 
 class UserRead(BaseModel):
@@ -133,7 +134,6 @@ class LoanReturn(BaseModel):
 class TeacherLoan(BaseModel):
     """Nauczyciel wypożycza sprzęt dla siebie bez dodatkowej autoryzacji."""
     item_id: int
-    user_id: int
 
 # ---------------------------------------------------------------------------
 # Dependency
@@ -260,6 +260,8 @@ async def delete_user(user_id: int, db: db_dependency, current_user: models.User
     db_user = db.query(models.User).filter(models.User.id == user_id).first()
     if not db_user:
         raise HTTPException(status_code=404, detail="Użytkownik nie znaleziony")
+    if db_user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="Nie możesz usunąć samego siebie")
     db.delete(db_user)
     db.commit()
 
@@ -303,7 +305,7 @@ async def delete_item(item_id: int, db: db_dependency, current_user: models.User
     db.commit()
 
 # ---------------------------------------------------------------------------
-# DOSTĘPNOŚĆ — podgląd statusu (student i nauczyciel)
+# DOSTĘPNOŚĆ — podgląd statusu (student)
 # ---------------------------------------------------------------------------
 
 @app.get("/items/{item_id}/status", response_model=LoanRead,
@@ -326,11 +328,32 @@ async def list_availability(db: db_dependency):
             item_id=loan.item_id,
             item_name=loan.item.nazwa,  
             status=loan.status,
+            #bez user_id - student nie powinien widzieć
+        ))
+
+    return result
+# ---------------------------------------------------------------------------
+# DOSTĘPNOŚĆ — podgląd statusu (administrator i nauczyciel)
+# ---------------------------------------------------------------------------
+@app.get("/availability/details/", response_model=list[LoanRead],
+         tags=["Dostępność"], summary="Lista statusów z użytkownikami [nauczyciel/admin]")
+async def list_availability_details(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_teacher)
+):
+    loans = db.query(models.Loan).all()
+
+    result = []
+    for loan in loans:
+        result.append(LoanRead(
+            id=loan.id,
+            item_id=loan.item_id,
+            item_name=loan.item.nazwa,
+            status=loan.status,
             user_id=loan.user_id
         ))
 
     return result
-
 # ---------------------------------------------------------------------------
 # WYPOŻYCZENIA — akcje według ról
 # ---------------------------------------------------------------------------
@@ -374,7 +397,7 @@ async def teacher_loan(req: TeacherLoan, db: db_dependency,current_user: models.
     if loan.status.value != ItemStatus.dostepny.value:
         raise HTTPException(status_code=400, detail=f"Przedmiot jest obecnie: {loan.status}")
     loan.status = ItemStatus.wypozyczony
-    loan.user_id = req.user_id
+    loan.user_id = current_user.id
     db.commit()
     db.refresh(loan)
     return loan
