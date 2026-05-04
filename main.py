@@ -15,6 +15,7 @@ from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from passlib.context import CryptContext
+from fastapi.staticfiles import StaticFiles
 
 app = FastAPI()
 security = HTTPBearer()
@@ -390,3 +391,5 @@ async def return_loan(req: LoanReturn, db: db_dependency, current_user: models.U
     db.commit()
     db.refresh(loan)
     return loan
+
+app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
