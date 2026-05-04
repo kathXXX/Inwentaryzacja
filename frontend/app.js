@@ -265,7 +265,7 @@ async function deleteItem() {
 
     await fetch(`${API_URL}/items/${id}`, {
         method: "DELETE",
-        headers: jsonAuthHeaders()
+        headers: authHeaders()
     });
 
     alert("Usunięto");
@@ -304,7 +304,7 @@ async function deleteUser() {
 
     await fetch(`${API_URL}/users/${id}`, {
         method: "DELETE",
-        headers: jsonAuthHeaders()
+        headers: authHeaders()
     });
 
     alert("Usunięto użytkownika");
