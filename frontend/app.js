@@ -1,4 +1,4 @@
-const API_URL = "http://127.0.0.1:8000";
+const API_URL = "https://web-production-53ca6.up.railway.app";
 
 // ------------------ UI RENDER ------------------
 
@@ -27,21 +27,34 @@ function renderLogin(app) {
 let token = null;
 let userRole = null;
 
+const authHeaders = () => ({
+    "Authorization": `Bearer ${token}`
+});
+
+const jsonAuthHeaders = () => ({
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${token}`
+});
+
 async function login() {
     const username = document.getElementById("login_username").value;
     const password = document.getElementById("login_password").value;
 
     const res = await fetch(`${API_URL}/login`, {
         method: "POST",
-        headers: {"Content-Type": "application/json", "Authorization": `Bearer ${token}`},
+        headers: {"Content-Type": "application/json"},
         body: JSON.stringify({ username, password })
     });
 
     const data = await res.json();
 
+    if (!res.ok) {
+        alert(data.detail || "Błąd logowania");
+        return;
+    }
+
     token = data.access_token;
 
-    // dekoduj payload JWT (prosto)
     const payload = JSON.parse(atob(token.split('.')[1]));
     userRole = payload.role;
 
@@ -173,7 +186,7 @@ async function requestLoan() {
 
     await fetch(`${API_URL}/loans/request/`, {
         method: "POST",
-        headers: {"Content-Type": "application/json", "Authorization": `Bearer ${token}`},
+        headers: jsonAuthHeaders(),
         body: JSON.stringify({ item_id, user_id })
     });
 
@@ -187,7 +200,7 @@ async function approveLoan() {
 
     await fetch(`${API_URL}/loans/approve/`, {
         method: "POST",
-        headers: {"Content-Type": "application/json", "Authorization": `Bearer ${token}`},
+        headers: jsonAuthHeaders(),
         body: JSON.stringify({ loan_id })
     });
 
@@ -200,7 +213,7 @@ async function teacherLoan() {
 
     await fetch(`${API_URL}/loans/teacher/`, {
         method: "POST",
-        headers: {"Content-Type": "application/json", "Authorization": `Bearer ${token}`},
+        headers: jsonAuthHeaders(),
         body: JSON.stringify({ item_id, user_id })
     });
 
@@ -212,7 +225,7 @@ async function returnLoan() {
 
     await fetch(`${API_URL}/loans/return/`, {
         method: "POST",
-        headers: {"Content-Type": "application/json", "Authorization": `Bearer ${token}`},
+        headers: jsonAuthHeaders(),
         body: JSON.stringify({ loan_id })
     });
 
@@ -235,7 +248,7 @@ async function addItem() {
 
     await fetch(`${API_URL}/items/`, {
         method: "POST",
-        headers: {"Content-Type": "application/json", "Authorization": `Bearer ${token}`},
+        headers: jsonAuthHeaders(),
         body: JSON.stringify({ nazwa, kategoria, lokalizacja })
     });
 
@@ -246,7 +259,8 @@ async function deleteItem() {
     const id = document.getElementById("delete_item_id").value;
 
     await fetch(`${API_URL}/items/${id}`, {
-        method: "DELETE"
+        method: "DELETE",
+        headers: jsonAuthHeaders()
     });
 
     alert("Usunięto");
@@ -273,7 +287,7 @@ async function createUser() {
 
     await fetch(`${API_URL}/users/`, {
         method: "POST",
-        headers: {"Content-Type": "application/json", "Authorization": `Bearer ${token}`},
+        headers: jsonAuthHeaders(),
         body: JSON.stringify({ username, password, role })
     });
 
@@ -284,7 +298,8 @@ async function deleteUser() {
     const id = document.getElementById("delete_user_id").value;
 
     await fetch(`${API_URL}/users/${id}`, {
-        method: "DELETE"
+        method: "DELETE",
+        headers: jsonAuthHeaders()
     });
 
     alert("Usunięto użytkownika");
