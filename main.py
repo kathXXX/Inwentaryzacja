@@ -17,9 +17,18 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from passlib.context import CryptContext
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from fastapi import Request
 
 app = FastAPI()
 security = HTTPBearer()
+
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_middleware(SlowAPIMiddleware)
 
 def get_db():
     db = SessionLocal()
@@ -46,7 +55,8 @@ class Token(BaseModel):
     token_type: str
 
 @app.post("/login", response_model=Token)
-def login(data: LoginRequest, db: db_dependency):
+@limiter.limit("5/minute")
+def login(request: Request, data: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.username == data.username).first()
 
     if not user or not verify_password(data.password, user.password):
@@ -73,7 +83,7 @@ def verify_password(plain, hashed):
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://web-production-53ca6.up.railway.app"]
+    allow_origins=["https://web-production-53ca6.up.railway.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
