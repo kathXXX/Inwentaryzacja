@@ -197,7 +197,7 @@ def generate_qr(item_id: int):
 
 @app.post("/users/", status_code=status.HTTP_201_CREATED, response_model=UserRead,
           tags=["Użytkownicy"], summary="Utwórz użytkownika [administrator]")
-async def create_user(user: UserCreate, db: db_dependency, current_user: models.User = Depends(require_admin)):
+async def create_user(user: UserCreate, db: db_dependency):
     existing = db.query(models.User).filter(models.User.username == user.username).first()
     if existing:
         raise HTTPException(status_code=400, detail="Użytkownik o tej nazwie już istnieje")
@@ -298,7 +298,7 @@ async def list_availability(db: db_dependency):
         result.append(LoanRead(
             id=loan.id,
             item_id=loan.item_id,
-            item_name=loan.item.nazwa,  # 👈 KLUCZOWE
+            item_name=loan.item.nazwa,  
             status=loan.status,
             user_id=loan.user_id
         ))
