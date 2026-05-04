@@ -344,7 +344,7 @@ async def list_availability(db: Session = Depends(get_db)):
 
     result = []
     for loan in loans:
-        result.append(LoanRead(
+        result.append(AvailabilityRead(
             id=loan.id,
             item_id=loan.item_id,
             item_name=loan.item.nazwa if loan.item else None,
