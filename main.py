@@ -29,7 +29,10 @@ def get_db():
 
 db_dependency = Annotated[Session, Depends(get_db)]
 
-SECRET_KEY = "SUPER_SECRET_KEY"  # zmień w produkcji
+SECRET_KEY = os.getenv("SECRET_KEY")
+
+if not SECRET_KEY:
+    raise RuntimeError("SECRET_KEY is not set")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
@@ -118,7 +121,6 @@ class LoanRead(BaseModel):
 class LoanRequest(BaseModel):
     """Student składa wniosek o wypożyczenie."""
     item_id: int
-    user_id: int
 
 class LoanApprove(BaseModel):
     """Nauczyciel zatwierdza wniosek (zmienia status z zarezerwowany → wypozyczony)."""
@@ -343,7 +345,7 @@ async def request_loan(req: LoanRequest, db: db_dependency, current_user: models
     if loan.status.value != ItemStatus.dostepny.value:
         raise HTTPException(status_code=400, detail=f"Przedmiot jest obecnie: {loan.status}")
     loan.status = ItemStatus.zarezerwowany
-    loan.user_id = req.user_id
+    loan.user_id = current_user.id
     db.commit()
     db.refresh(loan)
     return loan
