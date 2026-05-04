@@ -318,10 +318,19 @@ async def read_item(item_id: int, db: db_dependency):
 
 @app.delete("/items/{item_id}", status_code=status.HTTP_204_NO_CONTENT,
             tags=["Przedmioty"], summary="Usuń przedmiot [administrator]")
-async def delete_item(item_id: int, db: db_dependency, current_user: models.User = Depends(require_admin)):
+async def delete_item(
+    item_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_admin)
+):
     db_item = db.query(models.Item).filter(models.Item.id == item_id).first()
     if not db_item:
         raise HTTPException(status_code=404, detail="Przedmiot nie znaleziony")
+
+    db_loan = db.query(models.Loan).filter(models.Loan.item_id == item_id).first()
+    if db_loan:
+        db.delete(db_loan)
+
     db.delete(db_item)
     db.commit()
 
