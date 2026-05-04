@@ -18,6 +18,15 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 app = FastAPI()
 security = HTTPBearer()
 
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+db_dependency = Annotated[Session, Depends(get_db)]
+
 SECRET_KEY = "SUPER_SECRET_KEY"  # zmień w produkcji
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
