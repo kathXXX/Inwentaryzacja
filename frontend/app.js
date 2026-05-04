@@ -55,6 +55,11 @@ async function login() {
 
     token = data.access_token;
 
+    if (!token) {
+        alert("Backend nie zwrócił tokena");
+        return;
+    }
+
     const payload = JSON.parse(atob(token.split('.')[1]));
     userRole = payload.role;
 
