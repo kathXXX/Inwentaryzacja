@@ -1,24 +1,679 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-    <meta charset="UTF-8">
-    <title>Inventory App</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inventory App</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:       #0f1117;
+      --surface:  #181c27;
+      --surface2: #1f2435;
+      --border:   #2a3150;
+      --primary:  #4f8ef7;
+      --danger:   #f75c5c;
+      --success:  #3ecf8e;
+      --warning:  #f5a623;
+      --text:     #e8ecf4;
+      --muted:    #6b7a9e;
+      --mono:     "IBM Plex Mono", monospace;
+      --sans:     "IBM Plex Sans", sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem 4rem;
+    }
+
+    /* ── TOAST ── */
+    #toast-container { position: fixed; top: 1.2rem; right: 1.2rem; z-index: 9999; display: flex; flex-direction: column; gap: 0.5rem; }
+    .toast { font-family: var(--mono); font-size: 0.8rem; padding: 0.65rem 1rem; border-radius: 6px; border-left: 3px solid; animation: slideIn 0.25s ease, fadeOut 0.4s ease 2.6s forwards; max-width: 340px; }
+    .toast-success { background: rgba(62,207,142,0.12); border-color: var(--success); color: var(--success); }
+    .toast-error   { background: rgba(247,92,92,0.12);  border-color: var(--danger);  color: var(--danger); }
+    .toast-info    { background: rgba(79,142,247,0.12); border-color: var(--primary); color: var(--primary); }
+    @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes fadeOut { to { opacity: 0; transform: translateY(-4px); } }
+
+    /* ── SPINNER ── */
+    .spinner { width: 13px; height: 13px; border: 2px solid rgba(255,255,255,0.15); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; display: inline-block; vertical-align: middle; margin-right: 5px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── LOGIN ── */
+    #loginView { display: flex; flex-direction: column; align-items: center; width: 100%; padding-top: 8vh; animation: fadeUp 0.4s ease; }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    .login-logo { font-family: var(--mono); font-size: 1.7rem; font-weight: 600; color: var(--primary); letter-spacing: -1px; margin-bottom: 0.3rem; }
+    .login-logo span { color: var(--muted); font-weight: 400; }
+    .login-sub { color: var(--muted); font-size: 0.82rem; margin-bottom: 2.5rem; font-family: var(--mono); }
+
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 2rem; width: 100%; max-width: 380px; box-shadow: 0 8px 40px rgba(0,0,0,0.5); }
+    .card-title { font-family: var(--mono); font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 1.5rem; }
+
+    /* ── FORM ── */
+    .field { margin-bottom: 1rem; }
+    label { display: block; font-family: var(--mono); font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.35rem; }
+    input, select { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: var(--mono); font-size: 0.88rem; padding: 0.6rem 0.85rem; transition: border-color 0.2s; }
+    input:focus, select:focus { outline: none; border-color: var(--primary); }
+    input::placeholder { color: var(--muted); }
+    select option { background: var(--surface2); }
+
+    .btn { font-family: var(--mono); font-size: 0.82rem; font-weight: 600; padding: 0.55rem 1.1rem; border-radius: 6px; border: none; cursor: pointer; transition: opacity 0.15s, transform 0.1s; display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap; }
+    .btn:hover:not(:disabled) { opacity: 0.85; }
+    .btn:active:not(:disabled) { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-danger  { background: var(--danger);  color: #fff; }
+    .btn-success { background: var(--success); color: #000; }
+    .btn-ghost   { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+    .btn-warning { background: var(--warning); color: #000; }
+    .btn-sm   { padding: 0.28rem 0.65rem; font-size: 0.75rem; }
+    .btn-full { width: 100%; justify-content: center; margin-top: 0.5rem; }
+
+    /* ── APP ── */
+    #appView { display: none; width: 100%; max-width: 980px; animation: fadeUp 0.3s ease; }
+    .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.8rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
+    .topbar-logo { font-family: var(--mono); font-size: 1.1rem; font-weight: 600; color: var(--primary); }
+    .topbar-logo span { color: var(--muted); font-weight: 400; }
+    .topbar-right { display: flex; align-items: center; gap: 1rem; }
+    .topbar-user { font-family: var(--mono); font-size: 0.78rem; color: var(--muted); background: var(--surface2); padding: 0.3rem 0.8rem; border-radius: 99px; border: 1px solid var(--border); }
+
+    .role-pill { font-family: var(--mono); font-size: 0.68rem; padding: 0.15rem 0.55rem; border-radius: 99px; font-weight: 600; }
+    .role-administrator { background: rgba(247,92,92,0.15); color: var(--danger); border: 1px solid rgba(247,92,92,0.3); }
+    .role-nauczyciel    { background: rgba(245,166,35,0.15); color: var(--warning); border: 1px solid rgba(245,166,35,0.3); }
+    .role-student       { background: rgba(79,142,247,0.15); color: var(--primary); border: 1px solid rgba(79,142,247,0.3); }
+
+    /* ── SECTIONS ── */
+    .section { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem; margin-bottom: 1rem; }
+    .section-header { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1.2rem; }
+    .section-header h4 { font-family: var(--mono); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); font-weight: 600; }
+    .ml-auto { margin-left: auto; }
+    hr.div { border: none; border-top: 1px solid var(--border); margin: 1.2rem 0; }
+    .row { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: flex-end; }
+    .row input, .row select { flex: 1; min-width: 110px; }
+
+    /* ── TABLE ── */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+    th { text-align: left; padding: 0.5rem 0.75rem; font-family: var(--mono); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); border-bottom: 1px solid var(--border); }
+    td { padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border); font-family: var(--mono); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--surface2); }
+
+    .badge { display: inline-block; padding: 0.18rem 0.55rem; border-radius: 99px; font-size: 0.72rem; font-weight: 600; font-family: var(--mono); }
+    .badge-green  { background: rgba(62,207,142,0.15); color: var(--success); border: 1px solid rgba(62,207,142,0.3); }
+    .badge-yellow { background: rgba(245,166,35,0.15); color: var(--warning); border: 1px solid rgba(245,166,35,0.3); }
+    .badge-red    { background: rgba(247,92,92,0.15);  color: var(--danger);  border: 1px solid rgba(247,92,92,0.3); }
+
+    .empty-state { font-family: var(--mono); font-size: 0.82rem; color: var(--muted); padding: 1rem 0; text-align: center; }
+
+    #qrImg { margin-top: 1rem; border-radius: 8px; border: 1px solid var(--border); display: none; padding: 6px; background: #fff; }
+
+    footer { margin-top: 2rem; text-align: center; color: var(--muted); font-family: var(--mono); font-size: 0.7rem; }
+  </style>
 </head>
 <body>
 
-<h1>System inwentaryzacji</h1>
-<!--
-<h2>Wybierz rolę</h2>
-    <select id="role" onchange="renderUI()">
-    <option value="student">Student</option>
-    <option value="nauczyciel">Nauczyciel</option>
-    <option value="administrator">Administrator</option>
-</select>
--->
-<hr>
+<div id="toast-container"></div>
 
-<div id="app"></div>
+<!-- ══ LOGIN ══ -->
+<div id="loginView">
+  <div class="login-logo">inventory<span>.app</span></div>
+  <div class="login-sub">// Railway · FastAPI · PostgreSQL</div>
+  <div class="card">
+    <div class="card-title">Logowanie</div>
+    <div class="field">
+      <label>Użytkownik</label>
+      <input type="text" id="loginUser" placeholder="username" autocomplete="username" />
+    </div>
+    <div class="field">
+      <label>Hasło</label>
+      <input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password" />
+    </div>
+    <button class="btn btn-primary btn-full" id="loginBtn" onclick="login()">Zaloguj</button>
+  </div>
+</div>
 
-<script src="app.js"></script>
+<!-- ══ APP ══ -->
+<div id="appView">
+  <div class="topbar">
+    <div class="topbar-logo">inventory<span>.app</span></div>
+    <div class="topbar-right">
+      <span class="topbar-user" id="topbarUser">—</span>
+      <button class="btn btn-ghost btn-sm" onclick="logout()">Wyloguj</button>
+    </div>
+  </div>
+
+  <!-- PRZEDMIOTY + DOSTĘPNOŚĆ — wszyscy -->
+  <div class="section">
+    <div class="section-header">
+      <h4>📋 Przedmioty &amp; Dostępność</h4>
+      <button class="btn btn-ghost btn-sm ml-auto" onclick="loadAvailability()">↻ Odśwież</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>ID</th><th>Nazwa</th><th>Kategoria</th><th>Lokalizacja</th><th>Status</th><th>Użytkownik</th></tr>
+        </thead>
+        <tbody id="availTbody"><tr><td colspan="6" class="empty-state">Ładowanie…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- OCZEKUJĄCE WNIOSKI — nauczyciel / admin -->
+  <div class="section" id="sectionPending" style="display:none;">
+    <div class="section-header">
+      <h4>🕐 Oczekujące wnioski</h4>
+      <button class="btn btn-ghost btn-sm ml-auto" onclick="loadPending()">↻ Odśwież</button>
+    </div>
+    <div id="pendingList" class="empty-state">Brak oczekujących wniosków.</div>
+  </div>
+
+  <!-- WNIOSEK STUDENTA — student -->
+  <div class="section" id="sectionStudent" style="display:none;">
+    <div class="section-header"><h4>📥 Złóż wniosek o wypożyczenie</h4></div>
+    <p style="font-family:var(--mono);font-size:0.78rem;color:var(--muted);margin-bottom:0.9rem;">
+      Skopiuj ID przedmiotu z tabeli powyżej. Nauczyciel musi zatwierdzić wniosek.
+    </p>
+    <div class="row">
+      <input type="number" id="studentItemId" placeholder="ID przedmiotu" min="1" />
+      <button class="btn btn-primary" onclick="studentRequest()">Złóż wniosek</button>
+    </div>
+  </div>
+
+  <!-- AKCJE NAUCZYCIELA — nauczyciel / admin -->
+  <div class="section" id="sectionTeacher" style="display:none;">
+    <div class="section-header"><h4>🔄 Akcje nauczyciela</h4></div>
+
+    <label style="margin-bottom:0.4rem;">Wypożycz przedmiot dla siebie (bezpośrednio)</label>
+    <div class="row" style="margin-bottom:0.5rem;">
+      <input type="number" id="teacherItemId" placeholder="ID przedmiotu" min="1" />
+      <button class="btn btn-warning" onclick="teacherLoan()">Wypożycz dla siebie</button>
+    </div>
+
+    <hr class="div" />
+
+    <label style="margin-bottom:0.4rem;">Zatwierdź wniosek studenta</label>
+    <div class="row" style="margin-bottom:0.5rem;">
+      <input type="number" id="approveLoanId" placeholder="Loan ID" min="1" />
+      <button class="btn btn-success" onclick="approveLoan()">Zatwierdź</button>
+    </div>
+
+    <hr class="div" />
+
+    <label style="margin-bottom:0.4rem;">Oznacz jako zwrócony</label>
+    <div class="row">
+      <input type="number" id="returnLoanId" placeholder="Loan ID" min="1" />
+      <button class="btn btn-ghost" onclick="returnLoan()">Zwróć</button>
+    </div>
+  </div>
+
+  <!-- ZARZĄDZAJ PRZEDMIOTAMI — admin -->
+  <div class="section" id="sectionItems" style="display:none;">
+    <div class="section-header"><h4>➕ Zarządzaj przedmiotami [admin]</h4></div>
+    <div class="row">
+      <input type="text" id="addNazwa"       placeholder="Nazwa *" />
+      <input type="text" id="addKategoria"   placeholder="Kategoria *" />
+      <input type="text" id="addLokalizacja" placeholder="Lokalizacja *" />
+      <button class="btn btn-primary" onclick="addItem()">Dodaj</button>
+    </div>
+    <hr class="div" />
+    <div class="row">
+      <input type="number" id="delItemId" placeholder="ID przedmiotu do usunięcia" min="1" />
+      <button class="btn btn-danger" onclick="deleteItem()">Usuń przedmiot</button>
+    </div>
+  </div>
+
+  <!-- QR — wszyscy -->
+  <div class="section">
+    <div class="section-header"><h4>📲 QR kod przedmiotu</h4></div>
+    <div class="row">
+      <input type="number" id="qrItemId" placeholder="ID przedmiotu" min="1" />
+      <button class="btn btn-primary" onclick="generateQR()">Generuj QR</button>
+    </div>
+    <img id="qrImg" src="" alt="" width="160" height="160" />
+  </div>
+
+  <!-- UŻYTKOWNICY — admin -->
+  <div class="section" id="sectionUsers" style="display:none;">
+    <div class="section-header">
+      <h4>👥 Użytkownicy [admin]</h4>
+      <button class="btn btn-ghost btn-sm ml-auto" onclick="loadUsers()">↻ Odśwież</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>ID</th><th>Username</th><th>Rola</th><th></th></tr></thead>
+        <tbody id="usersTbody"><tr><td colspan="4" class="empty-state">Ładowanie…</td></tr></tbody>
+      </table>
+    </div>
+    <hr class="div" />
+    <div class="section-header"><h4>➕ Dodaj użytkownika</h4></div>
+    <div class="row" style="margin-bottom:0.5rem;">
+      <input type="text"     id="newUsername" placeholder="Username (min. 3 znaki)" />
+      <input type="password" id="newUserPass" placeholder="Hasło (min. 8 znaków)" />
+      <select id="newUserRole">
+        <option value="student">Student</option>
+        <option value="nauczyciel">Nauczyciel</option>
+        <option value="administrator">Administrator</option>
+      </select>
+      <button class="btn btn-primary" onclick="addUser()">Dodaj</button>
+    </div>
+    <hr class="div" />
+    <div class="row">
+      <input type="number" id="delUserId" placeholder="ID użytkownika do usunięcia" min="1" />
+      <button class="btn btn-danger" onclick="deleteUser()">Usuń użytkownika</button>
+    </div>
+  </div>
+
+  <footer>© 2026 inventory.app · Railway + FastAPI + PostgreSQL + JWT</footer>
+</div>
+
+<script>
+/* ════════════════════════════════════
+   CONFIG  — matches your openapi.json exactly
+════════════════════════════════════ */
+const BASE = "https://web-production-53ca6.up.railway.app";
+
+const R = {
+  login:              `${BASE}/login`,
+  items:              `${BASE}/items/`,
+  item:            id => `${BASE}/items/${id}`,
+  itemQr:          id => `${BASE}/items/${id}/qr`,
+  availability:       `${BASE}/availability/`,
+  availabilityDetail: `${BASE}/availability/details/`,
+  loansPending:       `${BASE}/loans/pending/`,
+  loansRequest:       `${BASE}/loans/request/`,
+  loansApprove:       `${BASE}/loans/approve/`,
+  loansTeacher:       `${BASE}/loans/teacher/`,
+  loansReturn:        `${BASE}/loans/return/`,
+  users:              `${BASE}/users/`,
+  user:            id => `${BASE}/users/${id}`,
+};
+
+/* ════════════════════════════════════
+   STATE
+════════════════════════════════════ */
+let token       = localStorage.getItem("inv_token") || null;
+let currentUser = JSON.parse(localStorage.getItem("inv_user") || "null");
+
+/* ════════════════════════════════════
+   UTILS
+════════════════════════════════════ */
+function toast(msg, type = "info") {
+  const el = document.createElement("div");
+  el.className = `toast toast-${type}`;
+  el.textContent = msg;
+  document.getElementById("toast-container").appendChild(el);
+  setTimeout(() => el.remove(), 3200);
+}
+
+async function api(url, opts = {}) {
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch(url, { ...opts, headers: { ...headers, ...(opts.headers || {}) } });
+  if (res.status === 401) { logout(); throw new Error("Sesja wygasła — zaloguj się ponownie."); }
+  if (res.status === 204) return null;
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try { const j = await res.json(); detail = j.detail || JSON.stringify(j); } catch {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+function show(id, visible) {
+  document.getElementById(id).style.display = visible ? "block" : "none";
+}
+
+/* ════════════════════════════════════
+   AUTH
+════════════════════════════════════ */
+async function login() {
+  const username = document.getElementById("loginUser").value.trim();
+  const password = document.getElementById("loginPass").value.trim();
+  if (!username || !password) return toast("Podaj login i hasło.", "error");
+
+  const btn = document.getElementById("loginBtn");
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner"></span>Logowanie…`;
+
+  try {
+    /* POST /login  —  JSON { username, password }  →  { access_token, token_type } */
+    const data = await api(R.login, {
+      method: "POST",
+      body: JSON.stringify({ username, password })
+    });
+    token = data.access_token;
+    localStorage.setItem("inv_token", token);
+
+    /* Try to get role from JWT payload */
+    let role = null;
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g,"+").replace(/_/g,"/")));
+      role = payload.role || payload.user_role || null;
+    } catch {}
+
+    /* Fetch user list to resolve id + role (no /users/me endpoint in your schema) */
+    let me = { username, role: role || "student", id: null };
+    try {
+      const users = await api(R.users);
+      const found = users.find(u => u.username === username);
+      if (found) me = found;
+    } catch {}
+
+    currentUser = me;
+    localStorage.setItem("inv_user", JSON.stringify(me));
+    showApp();
+  } catch (e) {
+    toast(e.message || "Nieprawidłowe dane logowania.", "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Zaloguj";
+  }
+}
+
+function logout() {
+  token = null; currentUser = null;
+  localStorage.removeItem("inv_token");
+  localStorage.removeItem("inv_user");
+  show("appView", false);
+  document.getElementById("loginView").style.display = "flex";
+  document.getElementById("loginUser").value = "";
+  document.getElementById("loginPass").value = "";
+}
+
+/* ════════════════════════════════════
+   SHOW APP + ROLE GATES
+════════════════════════════════════ */
+function showApp() {
+  document.getElementById("loginView").style.display = "none";
+  show("appView", true);
+
+  const role     = currentUser?.role || "student";
+  const isAdmin  = role === "administrator";
+  const isTeach  = role === "nauczyciel" || isAdmin;
+  const isStud   = role === "student";
+
+  document.getElementById("topbarUser").innerHTML =
+    `${currentUser?.username || "?"}&nbsp;<span class="role-pill role-${role}">${role}</span>`;
+
+  show("sectionPending", isTeach);
+  show("sectionTeacher", isTeach);
+  show("sectionStudent", isStud);
+  show("sectionItems",   isAdmin);
+  show("sectionUsers",   isAdmin);
+
+  loadAvailability();
+  if (isTeach) loadPending();
+  if (isAdmin) loadUsers();
+}
+
+/* ════════════════════════════════════
+   AVAILABILITY  (items + loan status merged)
+════════════════════════════════════ */
+async function loadAvailability() {
+  const tbody = document.getElementById("availTbody");
+  tbody.innerHTML = `<tr><td colspan="6" class="empty-state">Ładowanie…</td></tr>`;
+  try {
+    const role    = currentUser?.role || "student";
+    const isPriv  = role === "nauczyciel" || role === "administrator";
+
+    /* Run both requests in parallel */
+    const [items, loans] = await Promise.all([
+      api(R.items),                                              // ItemRead[]  — no auth needed
+      api(isPriv ? R.availabilityDetail : R.availability)       // LoanRead[]
+    ]);
+
+    /* Map: item_id → loan */
+    const loanMap = {};
+    loans.forEach(l => { loanMap[l.item_id] = l; });
+
+    renderAvailability(items, loanMap, isPriv);
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="6" class="empty-state" style="color:var(--danger);">${e.message}</td></tr>`;
+    toast("Błąd ładowania: " + e.message, "error");
+  }
+}
+
+function statusBadge(s) {
+  if (!s || s === "dostepny")  return `<span class="badge badge-green">dostępny</span>`;
+  if (s === "zarezerwowany")   return `<span class="badge badge-yellow">zarezerwowany</span>`;
+  if (s === "wypozyczony")     return `<span class="badge badge-red">wypożyczony</span>`;
+  return `<span class="badge">${s}</span>`;
+}
+
+function renderAvailability(items, loanMap, showUser) {
+  const tbody = document.getElementById("availTbody");
+  if (!items.length) { tbody.innerHTML = `<tr><td colspan="6" class="empty-state">Brak przedmiotów.</td></tr>`; return; }
+  tbody.innerHTML = items.map(item => {
+    const loan   = loanMap[item.id];
+    const status = loan?.status  || "dostepny";
+    const uid    = loan?.user_id || null;
+    return `<tr>
+      <td>${item.id}</td>
+      <td>${item.nazwa}</td>
+      <td>${item.kategoria}</td>
+      <td>${item.lokalizacja}</td>
+      <td>${statusBadge(status)}</td>
+      <td>${uid ? (showUser ? "#" + uid : "zajęty") : "—"}</td>
+    </tr>`;
+  }).join("");
+}
+
+/* ════════════════════════════════════
+   PENDING LOANS
+════════════════════════════════════ */
+async function loadPending() {
+  try {
+    /* GET /loans/pending/  →  LoanRead[] */
+    const loans = await api(R.loansPending);
+    const div = document.getElementById("pendingList");
+    if (!loans.length) { div.innerHTML = `<span class="empty-state">Brak oczekujących wniosków.</span>`; return; }
+    div.innerHTML = loans.map(l => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:0.55rem 0;border-bottom:1px solid var(--border);">
+        <span style="font-family:var(--mono);font-size:0.82rem;">
+          Loan <strong>#${l.id}</strong> · ${l.item_name || "Przedmiot #" + l.item_id} · User #${l.user_id}
+        </span>
+        <button class="btn btn-success btn-sm" onclick="approveLoanById(${l.id})">Zatwierdź</button>
+      </div>`).join("");
+  } catch (e) { toast("Błąd wniosków: " + e.message, "error"); }
+}
+
+/* ════════════════════════════════════
+   STUDENT — request
+════════════════════════════════════ */
+async function studentRequest() {
+  const item_id = parseInt(document.getElementById("studentItemId").value);
+  if (!item_id) return toast("Podaj ID przedmiotu.", "error");
+  try {
+    /* POST /loans/request/  { item_id }  →  LoanRead  (201) */
+    const loan = await api(R.loansRequest, { method: "POST", body: JSON.stringify({ item_id }) });
+    toast(`Wniosek złożony — Loan #${loan.id}. Czekaj na zatwierdzenie.`, "success");
+    document.getElementById("studentItemId").value = "";
+    loadAvailability();
+  } catch (e) { toast("Błąd: " + e.message, "error"); }
+}
+
+/* ════════════════════════════════════
+   TEACHER — direct loan
+════════════════════════════════════ */
+async function teacherLoan() {
+  const item_id = parseInt(document.getElementById("teacherItemId").value);
+  if (!item_id) return toast("Podaj ID przedmiotu.", "error");
+  try {
+    /* POST /loans/teacher/  { item_id }  →  LoanRead  (201) */
+    const loan = await api(R.loansTeacher, { method: "POST", body: JSON.stringify({ item_id }) });
+    toast(`Wypożyczono — Loan #${loan.id}.`, "success");
+    document.getElementById("teacherItemId").value = "";
+    loadAvailability(); loadPending();
+  } catch (e) { toast("Błąd: " + e.message, "error"); }
+}
+
+/* ════════════════════════════════════
+   TEACHER — approve
+════════════════════════════════════ */
+async function approveLoan() {
+  const loan_id = parseInt(document.getElementById("approveLoanId").value);
+  if (!loan_id) return toast("Podaj Loan ID.", "error");
+  await approveLoanById(loan_id);
+  document.getElementById("approveLoanId").value = "";
+}
+
+async function approveLoanById(loan_id) {
+  try {
+    /* POST /loans/approve/  { loan_id }  →  LoanRead  (200) */
+    await api(R.loansApprove, { method: "POST", body: JSON.stringify({ loan_id }) });
+    toast(`Zatwierdzono Loan #${loan_id}.`, "success");
+    loadAvailability(); loadPending();
+  } catch (e) { toast("Błąd zatwierdzania: " + e.message, "error"); }
+}
+
+/* ════════════════════════════════════
+   TEACHER — return
+════════════════════════════════════ */
+async function returnLoan() {
+  const loan_id = parseInt(document.getElementById("returnLoanId").value);
+  if (!loan_id) return toast("Podaj Loan ID.", "error");
+  try {
+    /* POST /loans/return/  { loan_id }  →  LoanRead  (200) */
+    await api(R.loansReturn, { method: "POST", body: JSON.stringify({ loan_id }) });
+    toast(`Zwrócono Loan #${loan_id}.`, "success");
+    document.getElementById("returnLoanId").value = "";
+    loadAvailability(); loadPending();
+  } catch (e) { toast("Błąd zwrotu: " + e.message, "error"); }
+}
+
+/* ════════════════════════════════════
+   ITEMS (admin)
+════════════════════════════════════ */
+async function addItem() {
+  const nazwa       = document.getElementById("addNazwa").value.trim();
+  const kategoria   = document.getElementById("addKategoria").value.trim();
+  const lokalizacja = document.getElementById("addLokalizacja").value.trim();
+  if (!nazwa || !kategoria || !lokalizacja)
+    return toast("Wszystkie pola są wymagane.", "error");
+  try {
+    /* POST /items/  { nazwa, kategoria, lokalizacja }  →  ItemRead  (201) */
+    const item = await api(R.items, { method: "POST", body: JSON.stringify({ nazwa, kategoria, lokalizacja }) });
+    toast(`Dodano: ${item.nazwa} (#${item.id})`, "success");
+    ["addNazwa","addKategoria","addLokalizacja"].forEach(id => document.getElementById(id).value = "");
+    loadAvailability();
+  } catch (e) { toast("Błąd dodawania: " + e.message, "error"); }
+}
+
+async function deleteItem() {
+  const id = parseInt(document.getElementById("delItemId").value);
+  if (!id) return toast("Podaj ID przedmiotu.", "error");
+  if (!confirm(`Usunąć przedmiot #${id}?`)) return;
+  try {
+    /* DELETE /items/{id}  →  204 */
+    await api(R.item(id), { method: "DELETE" });
+    toast(`Usunięto przedmiot #${id}.`, "success");
+    document.getElementById("delItemId").value = "";
+    loadAvailability();
+  } catch (e) { toast("Błąd usuwania: " + e.message, "error"); }
+}
+
+/* ════════════════════════════════════
+   QR
+════════════════════════════════════ */
+async function generateQR() {
+  const id = parseInt(document.getElementById("qrItemId").value);
+  if (!id) return toast("Podaj ID przedmiotu.", "error");
+  try {
+    /* GET /items/{id}  for label; GET /items/{id}/qr  for QR data */
+    const [item, qrResp] = await Promise.all([
+      api(R.item(id)),
+      api(R.itemQr(id)).catch(() => null)
+    ]);
+
+    let src;
+    if (typeof qrResp === "string" && qrResp.startsWith("http")) {
+      src = qrResp;
+    } else if (qrResp?.url) {
+      src = qrResp.url;
+    } else if (qrResp?.qr_url) {
+      src = qrResp.qr_url;
+    } else {
+      /* Fallback: generate via public QR service */
+      const text = encodeURIComponent(`ID:${item.id}|${item.nazwa}|${item.kategoria}|${item.lokalizacja}`);
+      src = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${text}`;
+    }
+    const img = document.getElementById("qrImg");
+    img.src = src; img.alt = `QR – ${item.nazwa}`; img.style.display = "block";
+    toast(`QR dla: ${item.nazwa}`, "success");
+  } catch (e) { toast("Błąd QR: " + e.message, "error"); }
+}
+
+/* ════════════════════════════════════
+   USERS (admin)
+════════════════════════════════════ */
+async function loadUsers() {
+  try {
+    /* GET /users/  →  UserRead[]  (administrator only) */
+    const users = await api(R.users);
+    const tbody = document.getElementById("usersTbody");
+    if (!users.length) { tbody.innerHTML = `<tr><td colspan="4" class="empty-state">Brak użytkowników.</td></tr>`; return; }
+    tbody.innerHTML = users.map(u => `
+      <tr>
+        <td>${u.id}</td>
+        <td>${u.username}</td>
+        <td><span class="role-pill role-${u.role}">${u.role}</span></td>
+        <td>${u.id !== currentUser?.id
+          ? `<button class="btn btn-danger btn-sm" onclick="deleteUserById(${u.id})">Usuń</button>`
+          : `<span style="color:var(--muted);font-size:0.72rem;">(ty)</span>`}
+        </td>
+      </tr>`).join("");
+  } catch (e) { toast("Błąd użytkowników: " + e.message, "error"); }
+}
+
+async function addUser() {
+  const username = document.getElementById("newUsername").value.trim();
+  const password = document.getElementById("newUserPass").value.trim();
+  const role     = document.getElementById("newUserRole").value;
+  if (username.length < 3) return toast("Username: min. 3 znaki.", "error");
+  if (password.length < 8) return toast("Hasło: min. 8 znaków.", "error");
+  try {
+    /* POST /users/  { username, password, role }  →  UserRead  (201) */
+    const u = await api(R.users, { method: "POST", body: JSON.stringify({ username, password, role }) });
+    toast(`Dodano: ${u.username} (${u.role})`, "success");
+    document.getElementById("newUsername").value = "";
+    document.getElementById("newUserPass").value = "";
+    loadUsers();
+  } catch (e) { toast("Błąd: " + e.message, "error"); }
+}
+
+async function deleteUser() {
+  const id = parseInt(document.getElementById("delUserId").value);
+  if (!id) return toast("Podaj ID użytkownika.", "error");
+  await deleteUserById(id);
+  document.getElementById("delUserId").value = "";
+}
+
+async function deleteUserById(id) {
+  if (currentUser?.id === id) return toast("Nie możesz usunąć własnego konta.", "error");
+  if (!confirm(`Usunąć użytkownika #${id}?`)) return;
+  try {
+    /* DELETE /users/{id}  →  204 */
+    await api(R.user(id), { method: "DELETE" });
+    toast(`Usunięto użytkownika #${id}.`, "success");
+    loadUsers();
+  } catch (e) { toast("Błąd: " + e.message, "error"); }
+}
+
+/* ════════════════════════════════════
+   INIT
+════════════════════════════════════ */
+if (token && currentUser) showApp();
+
+document.addEventListener("keydown", e => {
+  if (e.key === "Enter" && document.getElementById("loginView").style.display !== "none") login();
+});
+</script>
 </body>
 </html>
