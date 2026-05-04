@@ -146,6 +146,16 @@ class TeacherLoan(BaseModel):
     """Nauczyciel wypożycza sprzęt dla siebie bez dodatkowej autoryzacji."""
     item_id: int
 
+class AvailabilityRead(BaseModel):
+    id: int
+    item_id: int
+    item_name: Optional[str] = None
+    kategoria: Optional[str] = None
+    lokalizacja: Optional[str] = None
+    status: ItemStatus
+
+class Config:
+    from_attributes = True
 # ---------------------------------------------------------------------------
 # Dependency
 # ---------------------------------------------------------------------------
@@ -319,7 +329,7 @@ async def delete_item(item_id: int, db: db_dependency, current_user: models.User
 # DOSTĘPNOŚĆ — podgląd statusu (student)
 # ---------------------------------------------------------------------------
 
-@app.get("/items/{item_id}/status", response_model=LoanRead,
+@app.get("/items/{item_id}/status", response_model=AvailabilityRead,
          tags=["Dostępność"], summary="Sprawdź status przedmiotu [wszyscy]")
 async def get_item_status(item_id: int, db: db_dependency):
     loan = db.query(models.Loan).filter(models.Loan.item_id == item_id).first()
@@ -327,7 +337,7 @@ async def get_item_status(item_id: int, db: db_dependency):
         raise HTTPException(status_code=404, detail="Brak rekordu dostępności dla tego przedmiotu")
     return loan
 
-@app.get("/availability/", response_model=list[LoanRead],
+@app.get("/availability/", response_model=list[AvailabilityRead],
          tags=["Dostępność"], summary="Lista dostępności [wszyscy]")
 async def list_availability(db: Session = Depends(get_db)):
     loans = db.query(models.Loan).all()

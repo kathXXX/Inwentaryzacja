@@ -171,7 +171,14 @@ function renderAdmin(app) {
 
 // Availability
 async function loadAvailability() {
-    const res = await fetch(`${API_URL}/availability/`);
+    const endpoint = userRole === "student"
+        ? `${API_URL}/availability/`
+        : `${API_URL}/availability/details/`;
+
+    const res = await fetch(endpoint, {
+        headers: userRole === "student" ? {} : authHeaders()
+    });
+
     const data = await res.json();
 
     const list = document.getElementById("availability");
@@ -179,7 +186,13 @@ async function loadAvailability() {
 
     data.forEach(a => {
         const li = document.createElement("li");
-        li.innerText = `LoanID:${a.id} | ${a.item_name} | Status:${a.status} | User:${a.user_id}`;
+
+        if (userRole === "student") {
+            li.innerText = `ID:${a.item_id} | ${a.item_name} | Status:${a.status}`;
+        } else {
+            li.innerText = `ID:${a.item_id} | ${a.item_name} | Status:${a.status} | User:${a.user_id}`;
+        }
+
         list.appendChild(li);
     });
 }
@@ -306,7 +319,7 @@ async function deleteUser() {
         method: "DELETE",
         headers: authHeaders()
     });
-
+    
     alert("Usunięto użytkownika");
 }
 
