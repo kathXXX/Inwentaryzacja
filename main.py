@@ -328,8 +328,8 @@ async def get_item_status(item_id: int, db: db_dependency):
     return loan
 
 @app.get("/availability/", response_model=list[LoanRead],
-         tags=["Dostępność"], summary="Lista wszystkich statusów [wszyscy]")
-async def list_availability(db: db_dependency):
+         tags=["Dostępność"], summary="Lista dostępności [wszyscy]")
+async def list_availability(db: Session = Depends(get_db)):
     loans = db.query(models.Loan).all()
 
     result = []
@@ -337,9 +337,8 @@ async def list_availability(db: db_dependency):
         result.append(LoanRead(
             id=loan.id,
             item_id=loan.item_id,
-            item_name=loan.item.nazwa,  
-            status=loan.status,
-            #bez user_id - student nie powinien widzieć
+            item_name=loan.item.nazwa if loan.item else None,
+            status=loan.status
         ))
 
     return result
