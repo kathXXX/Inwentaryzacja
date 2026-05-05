@@ -247,21 +247,42 @@
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>ID</th><th>Username</th><th>Rola</th><th></th></tr></thead>
-        <tbody id="usersTbody"><tr><td colspan="4" class="empty-state">Ładowanie…</td></tr></tbody>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Imię i nazwisko</th>
+                <th>Username</th>
+                <th>Kontakt</th>
+                <th>Rola</th>
+                <th>Szczegóły</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody id="usersTbody"><tr><td colspan="7" class="empty-state">Ładowanie…</td></tr></tbody>
       </table>
     </div>
     <hr class="div" />
     <div class="section-header"><h4>➕ Dodaj użytkownika</h4></div>
     <div class="row" style="margin-bottom:0.5rem;">
-      <input type="text"     id="newUsername" placeholder="Username (min. 3 znaki)" />
-      <input type="password" id="newUserPass" placeholder="Hasło (min. 8 znaków)" />
-      <select id="newUserRole">
-        <option value="student">Student</option>
-        <option value="nauczyciel">Nauczyciel</option>
-        <option value="administrator">Administrator</option>
-      </select>
-      <button class="btn btn-primary" onclick="addUser()">Dodaj</button>
+        <input type="text" id="newUsername" placeholder="Username (min. 3 znaki)" />
+        <input type="password" id="newUserPass" placeholder="Hasło (min. 8 znaków)" />
+
+        <input type="text" id="newFirstName" placeholder="Imię *" />
+        <input type="text" id="newLastName" placeholder="Nazwisko *" />
+        <input type="email" id="newEmail" placeholder="Email" />
+        <input type="text" id="newPhone" placeholder="Telefon" />
+
+        <select id="newUserRole">
+            <option value="student">Student</option>
+            <option value="nauczyciel">Nauczyciel</option>
+            <option value="administrator">Administrator</option>
+        </select>
+
+        <input type="text" id="newFieldOfStudy" placeholder="Kierunek studiów" />
+        <input type="text" id="newStudentIndex" placeholder="Numer indeksu" />
+        <input type="text" id="newDepartment" placeholder="Katedra" />
+
+        <button class="btn btn-primary" onclick="addUser()">Dodaj</button>
     </div>
     <hr class="div" />
     <div class="row">
@@ -615,37 +636,94 @@ async function generateQR() {
 ════════════════════════════════════ */
 async function loadUsers() {
   try {
-    /* GET /users/  →  UserRead[]  (administrator only) */
     const users = await api(R.users);
     const tbody = document.getElementById("usersTbody");
-    if (!users.length) { tbody.innerHTML = `<tr><td colspan="4" class="empty-state">Brak użytkowników.</td></tr>`; return; }
-    tbody.innerHTML = users.map(u => `
-      <tr>
-        <td>${u.id}</td>
-        <td>${u.username}</td>
-        <td><span class="role-pill role-${u.role}">${u.role}</span></td>
-        <td>${u.id !== currentUser?.id
-          ? `<button class="btn btn-danger btn-sm" onclick="deleteUserById(${u.id})">Usuń</button>`
-          : `<span style="color:var(--muted);font-size:0.72rem;">(ty)</span>`}
-        </td>
-      </tr>`).join("");
-  } catch (e) { toast("Błąd użytkowników: " + e.message, "error"); }
+
+    if (!users.length) {
+      tbody.innerHTML = `<tr><td colspan="7" class="empty-state">Brak użytkowników.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = users.map(u => {
+      const details = u.role === "student"
+        ? `Kierunek: ${u.field_of_study || "-"}<br>Indeks: ${u.student_index || "-"}`
+        : u.role === "nauczyciel"
+          ? `Katedra: ${u.department || "-"}`
+          : "-";
+
+      return `
+        <tr>
+          <td>${u.id}</td>
+          <td>${u.first_name || "-"} ${u.last_name || "-"}</td>
+          <td>${u.username}</td>
+          <td>${u.email || "-"}<br>${u.phone || "-"}</td>
+          <td><span class="role-pill role-${u.role}">${u.role}</span></td>
+          <td>${details}</td>
+          <td>${u.id !== currentUser?.id
+            ? `<button class="btn btn-danger btn-sm" onclick="deleteUserById(${u.id})">Usuń</button>`
+            : `<span style="color:var(--muted);font-size:0.72rem;">(ty)</span>`}
+          </td>
+        </tr>`;
+    }).join("");
+  } catch (e) {
+    toast("Błąd użytkowników: " + e.message, "error");
+  }
 }
 
 async function addUser() {
   const username = document.getElementById("newUsername").value.trim();
   const password = document.getElementById("newUserPass").value.trim();
-  const role     = document.getElementById("newUserRole").value;
+  const role = document.getElementById("newUserRole").value;
+
+  const first_name = document.getElementById("newFirstName").value.trim();
+  const last_name = document.getElementById("newLastName").value.trim();
+  const email = document.getElementById("newEmail").value.trim() || null;
+  const phone = document.getElementById("newPhone").value.trim() || null;
+
+  const field_of_study = document.getElementById("newFieldOfStudy").value.trim() || null;
+  const student_index = document.getElementById("newStudentIndex").value.trim() || null;
+  const department = document.getElementById("newDepartment").value.trim() || null;
+
   if (username.length < 3) return toast("Username: min. 3 znaki.", "error");
   if (password.length < 8) return toast("Hasło: min. 8 znaków.", "error");
+  if (first_name.length < 2) return toast("Imię: min. 2 znaki.", "error");
+  if (last_name.length < 2) return toast("Nazwisko: min. 2 znaki.", "error");
+
   try {
-    /* POST /users/  { username, password, role }  →  UserRead  (201) */
-    const u = await api(R.users, { method: "POST", body: JSON.stringify({ username, password, role }) });
-    toast(`Dodano: ${u.username} (${u.role})`, "success");
-    document.getElementById("newUsername").value = "";
-    document.getElementById("newUserPass").value = "";
+    const u = await api(R.users, {
+      method: "POST",
+      body: JSON.stringify({
+        username,
+        password,
+        role,
+        first_name,
+        last_name,
+        email,
+        phone,
+        field_of_study,
+        student_index,
+        department
+      })
+    });
+
+    toast(`Dodano: ${u.first_name} ${u.last_name} (${u.role})`, "success");
+
+    [
+      "newUsername",
+      "newUserPass",
+      "newFirstName",
+      "newLastName",
+      "newEmail",
+      "newPhone",
+      "newFieldOfStudy",
+      "newStudentIndex",
+      "newDepartment"
+    ].forEach(id => document.getElementById(id).value = "");
+
     loadUsers();
-  } catch (e) { toast("Błąd: " + e.message, "error"); }
+  } catch (e) {
+    toast("Błąd: " + e.message, "error");
+  }
 }
 
 async function deleteUser() {
