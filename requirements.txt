@@ -9,3 +9,4 @@ qrcode==8.2
 pillow==12.2.0
 bcrypt==4.0.1
 slowapi
+alembic

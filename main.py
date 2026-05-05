@@ -121,8 +121,16 @@ class UserRead(BaseModel):
     id: int
     username: str
     role: UserRole
-    class Config:
-        from_attributes = True
+
+    first_name: str
+    last_name: str
+    email: Optional[str]
+    phone: Optional[str]
+
+    field_of_study: Optional[str]
+    student_index: Optional[str]
+    department: Optional[str]
+
 
 class ItemCreate(BaseModel):
     nazwa: str
