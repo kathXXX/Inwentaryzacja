@@ -41,8 +41,8 @@ class User(Base):
     # tylko nauczyciel
     department: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
 
-    loans: Mapped[list["LoanHistory"]] = relationship("LoanHistory", back_populates="user", foreign_keys="LoanHistory.user_id")
-
+    loans: Mapped[list["LoanHistory"]] = relationship("LoanHistory", back_populates="user")
+    loan_history: Mapped[list["LoanHistory"]] = relationship("LoanHistory", back_populates="user", foreign_keys="LoanHistory.user_id")
 
 class Item(Base):
     __tablename__ = 'items'
@@ -64,7 +64,7 @@ class Loan(Base):
     user_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey('users.id'), nullable=True)
 
     item: Mapped["Item"] = relationship("Item", back_populates="loan")
-    user: Mapped[Optional["User"]] = relationship("User", back_populates="loans")
+    user: Mapped["User"] = relationship("User", back_populates="loans")
 
 class LoanHistory(Base):
     __tablename__ = "loan_history"
@@ -81,4 +81,5 @@ class LoanHistory(Base):
     returned_by_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
 
     item: Mapped["Item"] = relationship("Item")
-    user: Mapped["User"] = relationship("User", foreign_keys=[user_id], back_populates="loans")
+    user: Mapped["User"] = relationship("User", back_populates="loan_history", foreign_keys=[user_id])
+    
