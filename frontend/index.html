@@ -484,8 +484,9 @@ async function loadHistory() {
         <td><button class="btn btn-ghost btn-sm" onclick="showUserDetails(${h.user_id})">#${h.user_id}</button></td>
         <td>${formatDate(h.borrowed_at)}</td>
         <td>${formatDate(h.returned_at)}</td>
-        <td>${h.approved_by_id || "—"}</td>
-        <td>${h.returned_by_id || "—"}</td>
+        <td>${h.approved_by_id ? `<button class="btn btn-ghost btn-sm" onclick="showUserDetails(${h.approved_by_id})">#${h.approved_by_id}</button>`: "—"}</td>
+
+        <td>${h.returned_by_id ? `<button class="btn btn-ghost btn-sm" onclick="showUserDetails(${h.returned_by_id})">#${h.returned_by_id}</button>`: "—"}</td>
       </tr>
     `).join("");
   } catch (e) {
