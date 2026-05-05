@@ -23,6 +23,9 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from fastapi import Request
 import os
+from pydantic import Field
+from typing import Optional
+
 
 app = FastAPI()
 security = HTTPBearer()
@@ -100,6 +103,19 @@ class UserCreate(BaseModel):
     username: str = Field(min_length=3, max_length=50)
     password: str = Field(min_length=8, max_length=128)
     role: UserRole = UserRole.student
+
+    first_name: str = Field(min_length=2, max_length=100)
+    last_name: str = Field(min_length=2, max_length=100)
+
+    email: Optional[str] = None
+    phone: Optional[str] = None
+
+    # student
+    field_of_study: Optional[str] = None
+    student_index: Optional[str] = None
+
+    # nauczyciel
+    department: Optional[str] = None
 
 class UserRead(BaseModel):
     id: int
@@ -239,8 +255,16 @@ async def create_user(
     new_user = models.User(
         username=user.username,
         password=hashed_password,
-        role=user.role
-    )
+        role=user.role,
+
+        first_name=user.first_name,
+        last_name=user.last_name,
+        email=user.email,
+        phone=user.phone,
+
+        field_of_study=user.field_of_study,
+        student_index=user.student_index,
+        department=user.department)
 
     db.add(new_user)
     db.commit()
@@ -412,6 +436,13 @@ async def approve_loan(req: LoanApprove, db: db_dependency, current_user: models
     if loan.status.value != ItemStatus.zarezerwowany.value:
         raise HTTPException(status_code=400, detail="Można zatwierdzić tylko wnioski ze statusem 'zarezerwowany'")
     loan.status = ItemStatus.wypozyczony
+    
+    history = models.LoanHistory(
+        item_id=loan.item_id,
+        user_id=loan.user_id,
+        approved_by_id=current_user.id)   
+    
+    db.add(history)
     db.commit()
     db.refresh(loan)
     return loan
@@ -440,10 +471,27 @@ async def return_loan(req: LoanReturn, db: db_dependency, current_user: models.U
         raise HTTPException(status_code=404, detail="Wniosek nie znaleziony")
     if loan.status.value == ItemStatus.dostepny.value:
         raise HTTPException(status_code=400, detail="Przedmiot jest już dostępny")
+    history = db.query(models.LoanHistory).filter(
+        models.LoanHistory.item_id == loan.item_id,
+        models.LoanHistory.user_id == loan.user_id,
+        models.LoanHistory.returned_at == None).first()
+
+    if history:
+        history.returned_at = datetime.utcnow()
+        history.returned_by_id = current_user.id
+    
     loan.status = ItemStatus.dostepny
     loan.user_id = None
+    
     db.commit()
     db.refresh(loan)
     return loan
+
+@app.get("/loans/history/", tags=["Historia"], summary="Historia wypożyczeń [nauczyciel/admin]")
+async def loan_history(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_teacher)
+):
+    return db.query(models.LoanHistory).all()
 
 app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
