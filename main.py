@@ -210,7 +210,7 @@ async def list_pending_loans(db: db_dependency, current_user: models.User = Depe
 
 @app.get("/items/{item_id}/qr")
 def generate_qr(item_id: int):
-    data = f"ITEM:{item_id}"
+    data = f"https://web-production-53ca6.up.railway.app/return.html?item_id={item_id}"
 
     qr = qrcode.make(data)
 
