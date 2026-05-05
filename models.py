@@ -41,7 +41,7 @@ class User(Base):
     # tylko nauczyciel
     department: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
 
-    loans: Mapped[list["LoanHistory"]] = relationship("LoanHistory", back_populates="user")
+    loans: Mapped[list["LoanHistory"]] = relationship("LoanHistory", back_populates="user", foreign_keys="LoanHistory.user_id")
 
 
 class Item(Base):
