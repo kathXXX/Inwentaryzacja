@@ -450,6 +450,8 @@ async def approve_loan(req: LoanApprove, db: db_dependency, current_user: models
         user_id=loan.user_id,
         approved_by_id=current_user.id)   
     
+    loan.status = ItemStatus.wypozyczony
+    
     db.add(history)
     db.commit()
     db.refresh(loan)
@@ -466,6 +468,9 @@ async def teacher_loan(req: TeacherLoan, db: db_dependency,current_user: models.
         raise HTTPException(status_code=400, detail=f"Przedmiot jest obecnie: {loan.status}")
     loan.status = ItemStatus.wypozyczony
     loan.user_id = current_user.id
+    history = models.LoanHistory(item_id=loan.item_id, user_id=current_user.id, approved_by_id=current_user.id)
+
+    db.add(history)
     db.commit()
     db.refresh(loan)
     return loan
@@ -479,17 +484,17 @@ async def return_loan(req: LoanReturn, db: db_dependency, current_user: models.U
         raise HTTPException(status_code=404, detail="Wniosek nie znaleziony")
     if loan.status.value == ItemStatus.dostepny.value:
         raise HTTPException(status_code=400, detail="Przedmiot jest już dostępny")
+    
     history = db.query(models.LoanHistory).filter(
         models.LoanHistory.item_id == loan.item_id,
         models.LoanHistory.user_id == loan.user_id,
-        models.LoanHistory.returned_at == None).first()
+        models.LoanHistory.returned_at == None).order_by(models.LoanHistory.borrowed_at.desc()).first()
 
     if history:
         history.returned_at = datetime.utcnow()
         history.returned_by_id = current_user.id
-    
-    loan.status = ItemStatus.dostepny
-    loan.user_id = None
+        loan.status = ItemStatus.dostepny
+        loan.user_id = None
     
     db.commit()
     db.refresh(loan)
