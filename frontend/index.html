@@ -212,7 +212,31 @@
       <button class="btn btn-ghost" onclick="returnLoan()">Zwróć</button>
     </div>
   </div>
+<div class="section" id="sectionHistory" style="display:none;">
+  <div class="section-header">
+    <h4>📚 Historia wypożyczeń [nauczyciel/admin]</h4>
+    <button class="btn btn-ghost btn-sm ml-auto" onclick="loadHistory()">↻ Odśwież</button>
+  </div>
 
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Item ID</th>
+          <th>User ID</th>
+          <th>Wypożyczono</th>
+          <th>Zwrócono</th>
+          <th>Zatwierdził</th>
+          <th>Przyjął zwrot</th>
+        </tr>
+      </thead>
+      <tbody id="historyTbody">
+        <tr><td colspan="7" class="empty-state">Brak historii.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
   <!-- ZARZĄDZAJ PRZEDMIOTAMI — admin -->
   <div class="section" id="sectionItems" style="display:none;">
     <div class="section-header"><h4>➕ Zarządzaj przedmiotami [admin]</h4></div>
@@ -314,6 +338,7 @@ const R = {
   loansReturn:        `${BASE}/loans/return/`,
   users:              `${BASE}/users/`,
   user:            id => `${BASE}/users/${id}`,
+  loansHistory: `${BASE}/loans/history/`
 };
 
 /* ════════════════════════════════════
@@ -424,6 +449,7 @@ function showApp() {
     `${currentUser?.username || "?"}&nbsp;<span class="role-pill role-${role}">${role}</span>`;
 
   show("sectionPending", isTeach);
+  show("sectionHistory", isTeach);
   show("sectionTeacher", isTeach);
   show("sectionStudent", isStud);
   show("sectionItems",   isAdmin);
@@ -431,9 +457,42 @@ function showApp() {
 
   loadAvailability();
   if (isTeach) loadPending();
+  if (isTeach) loadHistory();
   if (isAdmin) loadUsers();
 }
+function formatDate(d) {
+  if (!d) return "—";
+  return new Date(d).toLocaleString("pl-PL");
+}
 
+async function loadHistory() {
+  const tbody = document.getElementById("historyTbody");
+  tbody.innerHTML = `<tr><td colspan="7" class="empty-state">Ładowanie…</td></tr>`;
+
+  try {
+    const history = await api(R.loansHistory);
+
+    if (!history.length) {
+      tbody.innerHTML = `<tr><td colspan="7" class="empty-state">Brak historii.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = history.map(h => `
+      <tr>
+        <td>${h.id}</td>
+        <td>${h.item_id}</td>
+        <td><button class="btn btn-ghost btn-sm" onclick="showUserDetails(${h.user_id})">#${h.user_id}</button></td>
+        <td>${formatDate(h.borrowed_at)}</td>
+        <td>${formatDate(h.returned_at)}</td>
+        <td>${h.approved_by_id || "—"}</td>
+        <td>${h.returned_by_id || "—"}</td>
+      </tr>
+    `).join("");
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-state" style="color:var(--danger);">${e.message}</td></tr>`;
+    toast("Błąd historii: " + e.message, "error");
+  }
+}
 /* ════════════════════════════════════
    AVAILABILITY  (items + loan status merged)
 ════════════════════════════════════ */
@@ -485,7 +544,29 @@ function renderAvailability(items, loanMap, showUser) {
     </tr>`;
   }).join("");
 }
+async function showUserDetails(userId) {
+  try {
+    const u = await api(R.user(userId));
 
+    const extra = u.role === "student"
+      ? `Kierunek: ${u.field_of_study || "-"}\nIndeks: ${u.student_index || "-"}`
+      : u.role === "nauczyciel"
+        ? `Katedra: ${u.department || "-"}`
+        : "-";
+
+    alert(
+      `Użytkownik #${u.id}\n\n` +
+      `Imię i nazwisko: ${u.first_name || "-"} ${u.last_name || "-"}\n` +
+      `Username: ${u.username}\n` +
+      `Rola: ${u.role}\n` +
+      `Email: ${u.email || "-"}\n` +
+      `Telefon: ${u.phone || "-"}\n` +
+      `${extra}`
+    );
+  } catch (e) {
+    toast("Nie udało się pobrać danych użytkownika: " + e.message, "error");
+  }
+}
 /* ════════════════════════════════════
    PENDING LOANS
 ════════════════════════════════════ */
