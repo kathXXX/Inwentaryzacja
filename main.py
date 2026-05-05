@@ -301,7 +301,7 @@ async def list_users(
 
 @app.get("/users/{user_id}", response_model=UserRead,
          tags=["Użytkownicy"], summary="Pobierz użytkownika [administrator]")
-async def read_user(user_id: int, db: db_dependency, current_user: models.User = Depends(require_admin)):
+async def read_user(user_id: int, db: db_dependency, current_user: models.User = Depends(require_teacher)):
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Użytkownik nie znaleziony")

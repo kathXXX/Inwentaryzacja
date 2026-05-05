@@ -481,7 +481,7 @@ function renderAvailability(items, loanMap, showUser) {
       <td>${item.kategoria}</td>
       <td>${item.lokalizacja}</td>
       <td>${statusBadge(status)}</td>
-      <td>${uid ? (showUser ? "#" + uid : "zajęty") : "—"}</td>
+      <td>${uid?(showUser?`<button class="btn btn-ghost btn-sm" onclick="showUserDetails(${uid})">#${uid}</button>`: "zajęty"):"—"}</td>
     </tr>`;
   }).join("");
 }
