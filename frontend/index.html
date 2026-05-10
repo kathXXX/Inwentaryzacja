@@ -111,6 +111,19 @@
     .badge-red    { background: rgba(247,92,92,0.15);  color: var(--danger);  border: 1px solid rgba(247,92,92,0.3); }
 
     .empty-state { font-family: var(--mono); font-size: 0.82rem; color: var(--muted); padding: 1rem 0; text-align: center; }
+    .muted { color: var(--muted); }
+    .qr-result { display: none; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+    .qr-result-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem; margin-bottom: 0.9rem; }
+    .qr-field { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 0.7rem 0.8rem; min-height: 64px; }
+    .qr-label { display: block; font-family: var(--mono); font-size: 0.64rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.28rem; }
+    .qr-value { display: block; font-family: var(--mono); font-size: 0.84rem; overflow-wrap: anywhere; }
+    .qr-upload { align-items: center; margin-top: 0.75rem; }
+    .file-input { display: none; }
+    .qr-preview { display: none; width: 160px; max-width: 100%; margin-top: 0.75rem; border-radius: 8px; border: 1px solid var(--border); padding: 6px; background: #fff; }
+    .scan-status { margin-top: 0.6rem; font-family: var(--mono); font-size: 0.78rem; color: var(--muted); overflow-wrap: anywhere; }
+    .action-cell { min-width: 120px; }
+    .action-stack { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+    tr.qr-highlight td { background: rgba(79,142,247,0.12); }
 
     #qrImg { margin-top: 1rem; border-radius: 8px; border: 1px solid var(--border); display: none; padding: 6px; background: #fff; }
 
@@ -158,9 +171,9 @@
     <div class="table-wrap">
       <table>
         <thead>
-          <tr><th>ID</th><th>Nazwa</th><th>Kategoria</th><th>Lokalizacja</th><th>Status</th><th>Użytkownik</th></tr>
+          <tr><th>ID</th><th>Nazwa</th><th>Kategoria</th><th>Lokalizacja</th><th>Status</th><th>Użytkownik</th><th>Akcja</th></tr>
         </thead>
-        <tbody id="availTbody"><tr><td colspan="6" class="empty-state">Ładowanie…</td></tr></tbody>
+        <tbody id="availTbody"><tr><td colspan="7" class="empty-state">Ładowanie…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -261,6 +274,18 @@
       <button class="btn btn-primary" onclick="generateQR()">Generuj QR</button>
     </div>
     <img id="qrImg" src="" alt="" width="160" height="160" />
+    <hr class="div" />
+    <div class="row">
+      <input type="text" id="qrLookupCode" placeholder="Kod QR" />
+      <button class="btn btn-ghost" onclick="lookupQrFromInput()">Znajdź</button>
+    </div>
+    <div class="row qr-upload">
+      <label class="btn btn-ghost" for="qrFileInput">Wczytaj zdjęcie QR</label>
+      <input class="file-input" type="file" id="qrFileInput" accept="image/*" onchange="scanQrFile(event)" />
+    </div>
+    <img id="qrPreview" class="qr-preview" alt="" />
+    <div id="qrScanStatus" class="scan-status"></div>
+    <div id="qrResult" class="qr-result"></div>
   </div>
 
   <!-- UŻYTKOWNICY — admin -->
@@ -318,17 +343,19 @@
   <footer>© 2026 inventory.app · Railway + FastAPI + PostgreSQL + JWT</footer>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <script>
 /* ════════════════════════════════════
    CONFIG  — matches your openapi.json exactly
 ════════════════════════════════════ */
-const BASE = "https://web-production-53ca6.up.railway.app";
+const BASE = "/api";
 
 const R = {
   login:              `${BASE}/login`,
   items:              `${BASE}/items/`,
   item:            id => `${BASE}/items/${id}`,
   itemQr:          id => `${BASE}/items/${id}/qr`,
+  itemQrLookup: code => `${BASE}/items/qr/${encodeURIComponent(code)}`,
   availability:       `${BASE}/availability/`,
   availabilityDetail: `${BASE}/availability/details/`,
   loansPending:       `${BASE}/loans/pending/`,
@@ -338,7 +365,7 @@ const R = {
   loansReturn:        `${BASE}/loans/return/`,
   users:              `${BASE}/users/`,
   user:            id => `${BASE}/users/${id}`,
-  loansHistory: `${BASE}/loans/history/`
+  loansHistory:      `${BASE}/loans/history/`
 };
 
 /* ════════════════════════════════════
@@ -346,6 +373,7 @@ const R = {
 ════════════════════════════════════ */
 let token       = localStorage.getItem("inv_token") || null;
 let currentUser = JSON.parse(localStorage.getItem("inv_user") || "null");
+let currentQrCode = new URLSearchParams(window.location.search).get("qr") || null;
 
 /* ════════════════════════════════════
    UTILS
@@ -374,6 +402,25 @@ async function api(url, opts = {}) {
 
 function show(id, visible) {
   document.getElementById(id).style.display = visible ? "block" : "none";
+}
+
+function roleFlags() {
+  const role = currentUser?.role || "student";
+  return {
+    role,
+    isAdmin: role === "administrator",
+    isTeach: role === "nauczyciel" || role === "administrator",
+    isStud: role === "student"
+  };
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 /* ════════════════════════════════════
@@ -440,10 +487,7 @@ function showApp() {
   document.getElementById("loginView").style.display = "none";
   show("appView", true);
 
-  const role     = currentUser?.role || "student";
-  const isAdmin  = role === "administrator";
-  const isTeach  = role === "nauczyciel" || isAdmin;
-  const isStud   = role === "student";
+  const { role, isAdmin, isTeach, isStud } = roleFlags();
 
   document.getElementById("topbarUser").innerHTML =
     `${currentUser?.username || "?"}&nbsp;<span class="role-pill role-${role}">${role}</span>`;
@@ -459,6 +503,7 @@ function showApp() {
   if (isTeach) loadPending();
   if (isTeach) loadHistory();
   if (isAdmin) loadUsers();
+  if (currentQrCode) lookupQr(currentQrCode, { silent: true });
 }
 function formatDate(d) {
   if (!d) return "—";
@@ -499,7 +544,7 @@ async function loadHistory() {
 ════════════════════════════════════ */
 async function loadAvailability() {
   const tbody = document.getElementById("availTbody");
-  tbody.innerHTML = `<tr><td colspan="6" class="empty-state">Ładowanie…</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="7" class="empty-state">Ładowanie…</td></tr>`;
   try {
     const role    = currentUser?.role || "student";
     const isPriv  = role === "nauczyciel" || role === "administrator";
@@ -516,7 +561,7 @@ async function loadAvailability() {
 
     renderAvailability(items, loanMap, isPriv);
   } catch (e) {
-    tbody.innerHTML = `<tr><td colspan="6" class="empty-state" style="color:var(--danger);">${e.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-state" style="color:var(--danger);">${e.message}</td></tr>`;
     toast("Błąd ładowania: " + e.message, "error");
   }
 }
@@ -525,23 +570,49 @@ function statusBadge(s) {
   if (!s || s === "dostepny")  return `<span class="badge badge-green">dostępny</span>`;
   if (s === "zarezerwowany")   return `<span class="badge badge-yellow">zarezerwowany</span>`;
   if (s === "wypozyczony")     return `<span class="badge badge-red">wypożyczony</span>`;
-  return `<span class="badge">${s}</span>`;
+  return `<span class="badge">${escapeHtml(s)}</span>`;
+}
+
+function renderItemActions(itemId, loan = {}) {
+  const { isTeach, isStud } = roleFlags();
+  const status = loan?.status || "dostepny";
+  const loanId = loan?.id || loan?.loan_id || null;
+
+  if (isStud && status === "dostepny") {
+    return `<div class="action-stack"><button class="btn btn-primary btn-sm" onclick="studentRequestById(${itemId})">Wniosek</button></div>`;
+  }
+
+  if (isTeach && status === "dostepny") {
+    return `<div class="action-stack"><button class="btn btn-warning btn-sm" onclick="teacherLoanById(${itemId})">Wypożycz</button></div>`;
+  }
+
+  if (isTeach && status === "zarezerwowany" && loanId) {
+    return `<div class="action-stack"><button class="btn btn-success btn-sm" onclick="approveLoanById(${loanId})">Zatwierdź</button></div>`;
+  }
+
+  if (isTeach && status === "wypozyczony" && loanId) {
+    return `<div class="action-stack"><button class="btn btn-ghost btn-sm" onclick="returnLoanById(${loanId})">Zwróć</button></div>`;
+  }
+
+  return `<span class="muted">—</span>`;
 }
 
 function renderAvailability(items, loanMap, showUser) {
   const tbody = document.getElementById("availTbody");
-  if (!items.length) { tbody.innerHTML = `<tr><td colspan="6" class="empty-state">Brak przedmiotów.</td></tr>`; return; }
+  if (!items.length) { tbody.innerHTML = `<tr><td colspan="7" class="empty-state">Brak przedmiotów.</td></tr>`; return; }
   tbody.innerHTML = items.map(item => {
     const loan   = loanMap[item.id];
     const status = loan?.status  || "dostepny";
     const uid    = loan?.user_id || null;
-    return `<tr>
+    const highlighted = currentQrCode && item.qr_code === currentQrCode;
+    return `<tr data-item-id="${item.id}" class="${highlighted ? "qr-highlight" : ""}">
       <td>${item.id}</td>
-      <td>${item.nazwa}</td>
-      <td>${item.kategoria}</td>
-      <td>${item.lokalizacja}</td>
+      <td>${escapeHtml(item.nazwa)}</td>
+      <td>${escapeHtml(item.kategoria)}</td>
+      <td>${escapeHtml(item.lokalizacja)}</td>
       <td>${statusBadge(status)}</td>
       <td>${uid?(showUser?`<button class="btn btn-ghost btn-sm" onclick="showUserDetails(${uid})">#${uid}</button>`: "zajęty"):"—"}</td>
+      <td class="action-cell">${renderItemActions(item.id, loan)}</td>
     </tr>`;
   }).join("");
 }
@@ -593,12 +664,17 @@ async function loadPending() {
 async function studentRequest() {
   const item_id = parseInt(document.getElementById("studentItemId").value);
   if (!item_id) return toast("Podaj ID przedmiotu.", "error");
+  await studentRequestById(item_id);
+  document.getElementById("studentItemId").value = "";
+}
+
+async function studentRequestById(item_id) {
   try {
     /* POST /loans/request/  { item_id }  →  LoanRead  (201) */
     const loan = await api(R.loansRequest, { method: "POST", body: JSON.stringify({ item_id }) });
     toast(`Wniosek złożony — Loan #${loan.id}. Czekaj na zatwierdzenie.`, "success");
-    document.getElementById("studentItemId").value = "";
     loadAvailability();
+    refreshQrResult();
   } catch (e) { toast("Błąd: " + e.message, "error"); }
 }
 
@@ -608,12 +684,17 @@ async function studentRequest() {
 async function teacherLoan() {
   const item_id = parseInt(document.getElementById("teacherItemId").value);
   if (!item_id) return toast("Podaj ID przedmiotu.", "error");
+  await teacherLoanById(item_id);
+  document.getElementById("teacherItemId").value = "";
+}
+
+async function teacherLoanById(item_id) {
   try {
     /* POST /loans/teacher/  { item_id }  →  LoanRead  (201) */
     const loan = await api(R.loansTeacher, { method: "POST", body: JSON.stringify({ item_id }) });
     toast(`Wypożyczono — Loan #${loan.id}.`, "success");
-    document.getElementById("teacherItemId").value = "";
-    loadAvailability(); loadPending();
+    loadAvailability(); loadPending(); loadHistory();
+    refreshQrResult();
   } catch (e) { toast("Błąd: " + e.message, "error"); }
 }
 
@@ -632,7 +713,8 @@ async function approveLoanById(loan_id) {
     /* POST /loans/approve/  { loan_id }  →  LoanRead  (200) */
     await api(R.loansApprove, { method: "POST", body: JSON.stringify({ loan_id }) });
     toast(`Zatwierdzono Loan #${loan_id}.`, "success");
-    loadAvailability(); loadPending();
+    loadAvailability(); loadPending(); loadHistory();
+    refreshQrResult();
   } catch (e) { toast("Błąd zatwierdzania: " + e.message, "error"); }
 }
 
@@ -642,12 +724,17 @@ async function approveLoanById(loan_id) {
 async function returnLoan() {
   const loan_id = parseInt(document.getElementById("returnLoanId").value);
   if (!loan_id) return toast("Podaj Loan ID.", "error");
+  await returnLoanById(loan_id);
+  document.getElementById("returnLoanId").value = "";
+}
+
+async function returnLoanById(loan_id) {
   try {
     /* POST /loans/return/  { loan_id }  →  LoanRead  (200) */
     await api(R.loansReturn, { method: "POST", body: JSON.stringify({ loan_id }) });
     toast(`Zwrócono Loan #${loan_id}.`, "success");
-    document.getElementById("returnLoanId").value = "";
-    loadAvailability(); loadPending();
+    loadAvailability(); loadPending(); loadHistory();
+    refreshQrResult();
   } catch (e) { toast("Błąd zwrotu: " + e.message, "error"); }
 }
 
@@ -689,28 +776,189 @@ async function generateQR() {
   const id = parseInt(document.getElementById("qrItemId").value);
   if (!id) return toast("Podaj ID przedmiotu.", "error");
   try {
-    /* GET /items/{id}  for label; GET /items/{id}/qr  for QR data */
-    const [item, qrResp] = await Promise.all([
-      api(R.item(id)),
-      api(R.itemQr(id)).catch(() => null)
-    ]);
-
-    let src;
-    if (typeof qrResp === "string" && qrResp.startsWith("http")) {
-      src = qrResp;
-    } else if (qrResp?.url) {
-      src = qrResp.url;
-    } else if (qrResp?.qr_url) {
-      src = qrResp.qr_url;
-    } else {
-      /* Fallback: generate via public QR service */
-      const text = encodeURIComponent(`ID:${item.id}|${item.nazwa}|${item.kategoria}|${item.lokalizacja}`);
-      src = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${text}`;
-    }
+    const item = await api(R.item(id));
     const img = document.getElementById("qrImg");
-    img.src = src; img.alt = `QR – ${item.nazwa}`; img.style.display = "block";
+    img.src = `${R.itemQr(id)}?t=${Date.now()}`;
+    img.alt = `QR - ${item.nazwa}`;
+    img.style.display = "block";
+    document.getElementById("qrLookupCode").value = item.qr_code;
     toast(`QR dla: ${item.nazwa}`, "success");
   } catch (e) { toast("Błąd QR: " + e.message, "error"); }
+}
+
+async function lookupQrFromInput() {
+  const qrCode = document.getElementById("qrLookupCode").value.trim();
+  if (!qrCode) return toast("Podaj kod QR.", "error");
+  await lookupQr(qrCode);
+}
+
+function extractQrCodeFromText(rawValue) {
+  const text = String(rawValue || "").trim();
+  if (!text) return "";
+
+  try {
+    const url = new URL(text, window.location.origin);
+    const qr = url.searchParams.get("qr");
+    if (qr) return qr;
+  } catch {}
+
+  const match = text.match(/[?&]qr=([^&#]+)/);
+  if (match) return decodeURIComponent(match[1].replace(/\+/g, " "));
+
+  return text;
+}
+
+async function scanQrFile(event) {
+  const file = event.target.files?.[0];
+  const status = document.getElementById("qrScanStatus");
+  const preview = document.getElementById("qrPreview");
+
+  if (!file) return;
+
+  preview.src = URL.createObjectURL(file);
+  preview.style.display = "block";
+  status.textContent = "Odczytuję QR ze zdjęcia…";
+
+  try {
+    const rawValue = await decodeQrFromFile(file);
+
+    if (!rawValue) {
+      status.textContent = "Nie znaleziono kodu QR na tym zdjęciu.";
+      toast("Nie znaleziono kodu QR.", "error");
+      return;
+    }
+
+    const qrCode = extractQrCodeFromText(rawValue);
+
+    if (!qrCode) {
+      status.textContent = "QR został odczytany, ale nie zawiera kodu przedmiotu.";
+      toast("Nieprawidłowy QR.", "error");
+      return;
+    }
+
+    document.getElementById("qrLookupCode").value = qrCode;
+    status.textContent = `Odczytano: ${qrCode}`;
+    await lookupQr(qrCode);
+  } catch (e) {
+    status.textContent = e.message || "Nie udało się odczytać QR ze zdjęcia.";
+    toast("Błąd skanowania QR: " + status.textContent, "error");
+  }
+}
+
+async function decodeQrFromFile(file) {
+  const nativeResult = await decodeQrWithBarcodeDetector(file);
+  if (nativeResult) return nativeResult;
+
+  const jsQrResult = await decodeQrWithJsQr(file);
+  if (jsQrResult) return jsQrResult;
+
+  if (typeof jsQR !== "function") {
+    throw new Error("Nie udało się załadować skanera QR. Sprawdź połączenie z internetem albo wklej kod ręcznie.");
+  }
+
+  return "";
+}
+
+async function decodeQrWithBarcodeDetector(file) {
+  if (!("BarcodeDetector" in window)) return "";
+
+  try {
+    if (BarcodeDetector.getSupportedFormats) {
+      const formats = await BarcodeDetector.getSupportedFormats();
+      if (!formats.includes("qr_code")) return "";
+    }
+
+    const detector = new BarcodeDetector({ formats: ["qr_code"] });
+    const imageBitmap = await createImageBitmap(file);
+    try {
+      const codes = await detector.detect(imageBitmap);
+      return codes[0]?.rawValue || "";
+    } finally {
+      if (imageBitmap?.close) imageBitmap.close();
+    }
+  } catch {
+    return "";
+  }
+}
+
+async function decodeQrWithJsQr(file) {
+  if (typeof jsQR !== "function") return "";
+
+  const imageBitmap = await createImageBitmap(file);
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = imageBitmap.width;
+    canvas.height = imageBitmap.height;
+
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(imageBitmap, 0, 0);
+
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const code = jsQR(imageData.data, imageData.width, imageData.height);
+    return code?.data || "";
+  } finally {
+    if (imageBitmap?.close) imageBitmap.close();
+  }
+}
+
+async function lookupQr(qrCode, opts = {}) {
+  currentQrCode = qrCode;
+
+  const input = document.getElementById("qrLookupCode");
+  if (input) input.value = qrCode;
+
+  const box = document.getElementById("qrResult");
+  box.style.display = "block";
+  if (!opts.silent) {
+    box.innerHTML = `<div class="empty-state">Szukam przedmiotu…</div>`;
+  }
+
+  try {
+    const item = await api(R.itemQrLookup(qrCode));
+    const loan = { id: item.loan_id, status: item.status, user_id: item.user_id };
+    renderQrResult(item, loan);
+    loadAvailability();
+  } catch (e) {
+    box.innerHTML = `<div class="empty-state" style="color:var(--danger);">${escapeHtml(e.message)}</div>`;
+    if (!opts.silent) toast("Błąd QR: " + e.message, "error");
+  }
+}
+
+function refreshQrResult() {
+  if (currentQrCode) lookupQr(currentQrCode, { silent: true });
+}
+
+function renderQrResult(item, loan) {
+  const box = document.getElementById("qrResult");
+  const userInfo = loan.user_id
+    ? `<button class="btn btn-ghost btn-sm" onclick="showUserDetails(${loan.user_id})">#${loan.user_id}</button>`
+    : `<span class="muted">—</span>`;
+
+  box.innerHTML = `
+    <div class="qr-result-grid">
+      <div class="qr-field">
+        <span class="qr-label">Przedmiot</span>
+        <span class="qr-value">#${item.item_id} · ${escapeHtml(item.nazwa)}</span>
+      </div>
+      <div class="qr-field">
+        <span class="qr-label">Kategoria</span>
+        <span class="qr-value">${escapeHtml(item.kategoria)}</span>
+      </div>
+      <div class="qr-field">
+        <span class="qr-label">Lokalizacja</span>
+        <span class="qr-value">${escapeHtml(item.lokalizacja)}</span>
+      </div>
+      <div class="qr-field">
+        <span class="qr-label">Status</span>
+        <span class="qr-value">${statusBadge(item.status)}</span>
+      </div>
+      <div class="qr-field">
+        <span class="qr-label">Użytkownik</span>
+        <span class="qr-value">${userInfo}</span>
+      </div>
+    </div>
+    ${renderItemActions(item.item_id, loan)}
+  `;
 }
 
 /* ════════════════════════════════════

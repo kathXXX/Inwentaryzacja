@@ -1,4 +1,4 @@
-const API_URL = "https://web-production-53ca6.up.railway.app";
+const API_URL = "/api";
 
 // ------------------ UI RENDER ------------------
 

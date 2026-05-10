@@ -1,4 +1,4 @@
-const API_URL = "";
+const API_URL = "/api";
 
 const params = new URLSearchParams(window.location.search);
 const itemId = params.get("item_id");
@@ -22,7 +22,7 @@ async function loadItem() {
 }
 
 button.addEventListener("click", async () => {
-    const token = localStorage.getItem("token");
+    const token = localStorage.getItem("inv_token") || localStorage.getItem("token");
 
     if (!token) {
         message.innerText = "Musisz być zalogowany jako nauczyciel lub administrator.";

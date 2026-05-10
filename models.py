@@ -1,8 +1,7 @@
-from sqlalchemy import Integer, String, ForeignKey, Enum
+from sqlalchemy import Integer, String, ForeignKey, Enum, DateTime
 from sqlalchemy.orm import relationship, Mapped, mapped_column, DeclarativeBase
 from typing import Optional
 import enum
-from sqlalchemy import DateTime
 from datetime import datetime
 
 class Base(DeclarativeBase):
@@ -51,6 +50,7 @@ class Item(Base):
     nazwa: Mapped[str] = mapped_column(String(100), nullable=False)
     kategoria: Mapped[str] = mapped_column(String(100), nullable=False)
     lokalizacja: Mapped[str] = mapped_column(String(100), nullable=False)
+    qr_code: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
 
     loan: Mapped[Optional["Loan"]] = relationship("Loan", back_populates="item", uselist=False)
 

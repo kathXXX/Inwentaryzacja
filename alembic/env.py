@@ -1,3 +1,4 @@
+import os
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
@@ -26,6 +27,12 @@ target_metadata = Base.metadata
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
 
+def get_database_url() -> str:
+    url = os.getenv("DATABASE_URL") or config.get_main_option("sqlalchemy.url")
+    if not url or url == "driver://user:pass@localhost/dbname":
+        raise RuntimeError("DATABASE_URL is not set")
+    return url
+
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
@@ -39,11 +46,11 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    
-    url = config.get_main_option("sqlalchemy.url")
+    url = get_database_url()
     context.configure(
         url=url,
         target_metadata=target_metadata,
+        compare_type=True,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
     )
@@ -53,12 +60,9 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    import os
-    from sqlalchemy import engine_from_config, pool
-
     config.set_main_option(
         "sqlalchemy.url",
-        os.getenv("DATABASE_URL")
+        get_database_url().replace("%", "%%")
     )
 
     connectable = engine_from_config(
@@ -70,7 +74,8 @@ def run_migrations_online() -> None:
     with connectable.connect() as connection:
         context.configure(
             connection=connection,
-            target_metadata=target_metadata
+            target_metadata=target_metadata,
+            compare_type=True,
         )
 
         with context.begin_transaction():
