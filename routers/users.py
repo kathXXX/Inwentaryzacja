@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from sqlalchemy.exc import IntegrityError
+
 import models
 from database import db_dependency
 from schemas import UserCreate, UserRead
@@ -47,16 +49,28 @@ async def create_user(
     )
 
     db.add(new_user)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+
+        raise HTTPException(
+            status_code=400,
+            detail="Uzytkownik o takim loginie juz istnieje",
+        )
     db.refresh(new_user)
+
     activation_link = f"{os.getenv('FRONTEND_URL')}/activate?token={activation_token}"
 
-    await send_activation_email(
-        to_email=user.email,
-        username=user.username,
-        password=user.password,
-        activation_link=activation_link,
-    )
+    try:
+        await send_activation_email(
+            to_email=user.email,
+            username=user.username,
+            password=plain_password,
+            activation_link=activation_link,
+        )
+    except Exception as e:
+        print(f"Nie udalo sie wyslac maila aktywacyjnego: {e}")
 
     return new_user
 
