@@ -1,4 +1,4 @@
-from sqlalchemy import Integer, String, ForeignKey, Enum, DateTime
+from sqlalchemy import Integer, String, ForeignKey, Enum, DateTime, Boolean
 from sqlalchemy.orm import relationship, Mapped, mapped_column, DeclarativeBase
 from typing import Optional
 import enum
@@ -25,7 +25,10 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     username: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
-    password: Mapped[str] = mapped_column(String(255), nullable=False)
+    password: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    activation_token: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    activation_token_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     role: Mapped[UserRole] = mapped_column(Enum(UserRole), default=UserRole.student, nullable=False)
 
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
