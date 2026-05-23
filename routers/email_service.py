@@ -10,6 +10,8 @@ async def send_activation_email(
     password: str,
     activation_link: str,
 ):
+    print("Wysylam mail do:", to_email)
+
     message = EmailMessage()
     message["From"] = os.getenv("SMTP_FROM")
     message["To"] = to_email
@@ -35,6 +37,12 @@ async def send_activation_email(
 
     if not smtp_host:
         raise RuntimeError("SMTP_HOST is not set")
+    if not smtp_user:
+        raise RuntimeError("SMTP_USER is not set")
+    if not smtp_password:
+        raise RuntimeError("SMTP_PASSWORD is not set")
+
+    print("Lacze z SMTP...")
 
     await aiosmtplib.send(
         message,
@@ -44,4 +52,6 @@ async def send_activation_email(
         password=os.getenv("SMTP_PASSWORD"),
         start_tls=True,
     )
+
+    print("Mail wyslany")
 
