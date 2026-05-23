@@ -28,6 +28,14 @@ async def send_activation_email(
 
         Link jest wazny 24 godziny.""")
 
+    smtp_host = os.getenv("SMTP_HOST")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USER")
+    smtp_password = os.getenv("SMTP_PASSWORD")
+
+    if not smtp_host:
+        raise RuntimeError("SMTP_HOST is not set")
+
     await aiosmtplib.send(
         message,
         hostname=os.getenv("SMTP_HOST"),
