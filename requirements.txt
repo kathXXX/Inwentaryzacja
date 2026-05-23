@@ -13,3 +13,4 @@ alembic
 aiosmtplib
 uvicorn
 python-dotenv
+resend
