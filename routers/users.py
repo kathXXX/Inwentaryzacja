@@ -5,6 +5,11 @@ from database import db_dependency
 from schemas import UserCreate, UserRead
 from security import hash_password, require_admin, require_teacher
 
+import os
+import secrets
+from datetime import datetime, timedelta
+from routers.email_service import send_activation_email
+
 
 router = APIRouter(prefix="/users", tags=["Uzytkownicy"])
 
@@ -19,10 +24,15 @@ async def create_user(
     user: UserCreate,
     db: db_dependency,
     current_user: models.User = Depends(require_admin),
+
 ):
+    activation_token = secrets.token_urlsafe(32)
+    plain_password = user.password
+
     new_user = models.User(
         username=user.username,
-        password=hash_password(user.password),
+        password=hash_password(plain_password),
+
         role=user.role,
         first_name=user.first_name,
         last_name=user.last_name,
@@ -31,11 +41,22 @@ async def create_user(
         field_of_study=user.field_of_study,
         student_index=user.student_index,
         department=user.department,
+        is_active=False,
+        activation_token=activation_token,
+        activation_token_expires_at=datetime.utcnow() + timedelta(hours=24),
     )
 
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+    activation_link = f"{os.getenv('FRONTEND_URL')}/activate?token={activation_token}"
+
+    await send_activation_email(
+        to_email=user.email,
+        username=user.username,
+        password=user.password,
+        activation_link=activation_link,
+    )
 
     return new_user
 
@@ -86,3 +107,28 @@ async def delete_user(
 
     db.delete(db_user)
     db.commit()
+
+
+
+    @router.post("/activate", summary="Aktywuj konto")
+    async def activate_user(
+        token: str,
+        db: db_dependency,
+    ):
+        user = db.query(models.User).filter(
+            models.User.activation_token == token
+        ).first()
+
+        if not user:
+            raise HTTPException(status_code=400, detail="Nieprawidlowy token")
+
+        if user.activation_token_expires_at < datetime.utcnow():
+            raise HTTPException(status_code=400, detail="Token wygasl")
+
+        user.is_active = True
+        user.activation_token = None
+        user.activation_token_expires_at = None
+
+        db.commit()
+
+        return {"message": "Konto zostalo aktywowane"}
