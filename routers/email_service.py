@@ -46,11 +46,11 @@ async def send_activation_email(
 
     await aiosmtplib.send(
         message,
-        hostname=os.getenv("SMTP_HOST"),
-        port=int(os.getenv("SMTP_PORT", "587")),
-        username=os.getenv("SMTP_USER"),
-        password=os.getenv("SMTP_PASSWORD"),
-        start_tls=True,
+        hostname=smtp_host,
+        port=smtp_port,
+        username=smtp_user,
+        password=smtp_password,
+        use_tls=True,
     )
 
     print("Mail wyslany")
