@@ -58,9 +58,11 @@
     /* ── FORM ── */
     .field { margin-bottom: 1rem; }
     label { display: block; font-family: var(--mono); font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.35rem; }
-    input, select { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: var(--mono); font-size: 0.88rem; padding: 0.6rem 0.85rem; transition: border-color 0.2s; }
-    input:focus, select:focus { outline: none; border-color: var(--primary); }
+    input, select, textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: var(--mono); font-size: 0.88rem; padding: 0.6rem 0.85rem; transition: border-color 0.2s; }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary); }
     input::placeholder { color: var(--muted); }
+    textarea { resize: vertical; min-height: 120px; }
+    textarea::placeholder { color: var(--muted); }
     select option { background: var(--surface2); }
 
     .btn { font-family: var(--mono); font-size: 0.82rem; font-weight: 600; padding: 0.55rem 1.1rem; border-radius: 6px; border: none; cursor: pointer; transition: opacity 0.15s, transform 0.1s; display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap; }
@@ -278,6 +280,17 @@
     </div>
     <hr class="div" />
     <div class="row">
+      <input type="text" id="bulkKategoria" placeholder="Kategoria *" />
+      <input type="text" id="bulkLokalizacja" placeholder="Sala / lokalizacja *" />
+    </div>
+    <div class="row" style="margin-top:0.5rem;">
+      <textarea id="bulkNames" placeholder="Nazwy sprzętów, każda w osobnej linii"></textarea>
+    </div>
+    <div class="row" style="margin-top:0.5rem;">
+      <button class="btn btn-success" onclick="bulkAddItemsPdf()">Dodaj wiele i pobierz PDF QR</button>
+    </div>
+    <hr class="div" />
+    <div class="row">
       <input type="number" id="delItemId" placeholder="ID przedmiotu do usunięcia" min="1" />
       <button class="btn btn-danger" onclick="deleteItem()">Usuń przedmiot</button>
     </div>
@@ -372,6 +385,7 @@ const R = {
   loginVerify:        `${BASE}/login/verify`,
   changePassword:     `${BASE}/change-password`,
   items:              `${BASE}/items/`,
+  itemsBulkPdf:       `${BASE}/items/bulk/pdf`,
   item:            id => `${BASE}/items/${id}`,
   itemQr:          id => `${BASE}/items/${id}/qr`,
   itemQrLookup: code => `${BASE}/items/qr/${encodeURIComponent(code)}`,
@@ -852,6 +866,57 @@ async function addItem() {
     ["addNazwa","addKategoria","addLokalizacja"].forEach(id => document.getElementById(id).value = "");
     loadAvailability();
   } catch (e) { toast("Błąd dodawania: " + e.message, "error"); }
+}
+
+async function bulkAddItemsPdf() {
+  const kategoria = document.getElementById("bulkKategoria").value.trim();
+  const lokalizacja = document.getElementById("bulkLokalizacja").value.trim();
+  const names = document.getElementById("bulkNames").value
+    .split(/\r?\n/)
+    .map(name => name.trim())
+    .filter(Boolean);
+
+  if (!kategoria || !lokalizacja) return toast("Podaj kategorię i salę.", "error");
+  if (!names.length) return toast("Podaj przynajmniej jedną nazwę sprzętu.", "error");
+  if (names.length > 100) return toast("Możesz dodać maksymalnie 100 sprzętów na raz.", "error");
+
+  try {
+    const headers = { "Content-Type": "application/json" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    const res = await fetch(R.itemsBulkPdf, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ names, kategoria, lokalizacja })
+    });
+
+    if (res.status === 401) {
+      logout();
+      throw new Error("Sesja wygasła — zaloguj się ponownie.");
+    }
+
+    if (!res.ok) {
+      let detail = `HTTP ${res.status}`;
+      try { const j = await res.json(); detail = j.detail || JSON.stringify(j); } catch {}
+      throw new Error(detail);
+    }
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `etykiety-qr-${new Date().toISOString().slice(0, 10)}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+
+    toast(`Dodano ${names.length} sprzętów i pobrano PDF.`, "success");
+    ["bulkKategoria", "bulkLokalizacja", "bulkNames"].forEach(id => document.getElementById(id).value = "");
+    loadAvailability();
+  } catch (e) {
+    toast("Błąd dodawania wielu sprzętów: " + e.message, "error");
+  }
 }
 
 async function deleteItem() {

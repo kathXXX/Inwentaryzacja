@@ -71,6 +71,12 @@ class ItemCreate(BaseModel):
     lokalizacja: str
 
 
+class ItemBulkCreate(BaseModel):
+    names: list[str] = Field(min_length=1, max_length=100)
+    kategoria: str = Field(min_length=1, max_length=100)
+    lokalizacja: str = Field(min_length=1, max_length=100)
+
+
 class ItemRead(BaseModel):
     id: int
     nazwa: str
