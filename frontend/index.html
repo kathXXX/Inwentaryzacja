@@ -149,6 +149,14 @@
       <input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password" />
     </div>
     <button class="btn btn-primary btn-full" id="loginBtn" onclick="login()">Zaloguj</button>
+    <div id="loginCodeBox" style="display:none;margin-top:1rem;">
+      <hr class="div" />
+      <div class="field">
+        <label>Kod z emaila</label>
+        <input type="text" id="loginCode" placeholder="000000" inputmode="numeric" autocomplete="one-time-code" />
+      </div>
+      <button class="btn btn-success btn-full" id="loginCodeBtn" onclick="verifyLoginCode()">Potwierdź kod</button>
+    </div>
   </div>
 </div>
 
@@ -159,6 +167,15 @@
     <div class="topbar-right">
       <span class="topbar-user" id="topbarUser">—</span>
       <button class="btn btn-ghost btn-sm" onclick="logout()">Wyloguj</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header"><h4>Konto</h4></div>
+    <div class="row">
+      <input type="password" id="currentPassword" placeholder="Aktualne hasło" autocomplete="current-password" />
+      <input type="password" id="newPassword" placeholder="Nowe hasło (min. 8 znaków)" autocomplete="new-password" />
+      <button class="btn btn-ghost" onclick="changePassword()">Zmień hasło</button>
     </div>
   </div>
 
@@ -318,7 +335,7 @@
 
         <input type="text" id="newFirstName" placeholder="Imię *" />
         <input type="text" id="newLastName" placeholder="Nazwisko *" />
-        <input type="email" id="newEmail" placeholder="Email" />
+        <input type="email" id="newEmail" placeholder="Email *" />
         <input type="text" id="newPhone" placeholder="Telefon" />
 
         <select id="newUserRole">
@@ -352,6 +369,8 @@ const BASE = "/api";
 
 const R = {
   login:              `${BASE}/login`,
+  loginVerify:        `${BASE}/login/verify`,
+  changePassword:     `${BASE}/change-password`,
   items:              `${BASE}/items/`,
   item:            id => `${BASE}/items/${id}`,
   itemQr:          id => `${BASE}/items/${id}/qr`,
@@ -365,6 +384,7 @@ const R = {
   loansReturn:        `${BASE}/loans/return/`,
   users:              `${BASE}/users/`,
   user:            id => `${BASE}/users/${id}`,
+  activateUser:  token => `${BASE}/users/activate?token=${encodeURIComponent(token)}`,
   loansHistory:      `${BASE}/loans/history/`
 };
 
@@ -374,6 +394,8 @@ const R = {
 let token       = localStorage.getItem("inv_token") || null;
 let currentUser = JSON.parse(localStorage.getItem("inv_user") || "null");
 let currentQrCode = new URLSearchParams(window.location.search).get("qr") || null;
+let pendingLoginChallenge = null;
+let pendingLoginUsername = null;
 
 /* ════════════════════════════════════
    UTILS
@@ -436,32 +458,19 @@ async function login() {
   btn.innerHTML = `<span class="spinner"></span>Logowanie…`;
 
   try {
-    /* POST /login  —  JSON { username, password }  →  { access_token, token_type } */
+    /* POST /login — sends a one-time email code. */
     const data = await api(R.login, {
       method: "POST",
       body: JSON.stringify({ username, password })
     });
-    token = data.access_token;
-    localStorage.setItem("inv_token", token);
 
-    /* Try to get role from JWT payload */
-    let role = null;
-    try {
-      const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g,"+").replace(/_/g,"/")));
-      role = payload.role || payload.user_role || null;
-    } catch {}
+    pendingLoginChallenge = data.challenge_id;
+    pendingLoginUsername = username;
+    show("loginCodeBox", true);
+    document.getElementById("loginCode").focus();
 
-    /* Fetch user list to resolve id + role (no /users/me endpoint in your schema) */
-    let me = { username, role: role || "student", id: null };
-    try {
-      const users = await api(R.users);
-      const found = users.find(u => u.username === username);
-      if (found) me = found;
-    } catch {}
-
-    currentUser = me;
-    localStorage.setItem("inv_user", JSON.stringify(me));
-    showApp();
+    const devMsg = data.dev_code ? ` Kod testowy: ${data.dev_code}` : "";
+    toast(`${data.message || "Kod wysłany"}${data.email ? " na " + data.email : ""}.${devMsg}`, "success");
   } catch (e) {
     toast(e.message || "Nieprawidłowe dane logowania.", "error");
   } finally {
@@ -470,14 +479,103 @@ async function login() {
   }
 }
 
+async function verifyLoginCode() {
+  const code = document.getElementById("loginCode").value.trim();
+  if (!pendingLoginChallenge || !code) return toast("Podaj kod z emaila.", "error");
+
+  const btn = document.getElementById("loginCodeBtn");
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner"></span>Sprawdzam…`;
+
+  try {
+    const data = await api(R.loginVerify, {
+      method: "POST",
+      body: JSON.stringify({ challenge_id: pendingLoginChallenge, code })
+    });
+
+    await finishLogin(data.access_token, pendingLoginUsername || document.getElementById("loginUser").value.trim());
+  } catch (e) {
+    toast("Błąd kodu: " + e.message, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Potwierdź kod";
+  }
+}
+
+async function finishLogin(accessToken, username) {
+  token = accessToken;
+  localStorage.setItem("inv_token", token);
+
+  let role = null;
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g,"+").replace(/_/g,"/")));
+    role = payload.role || payload.user_role || null;
+  } catch {}
+
+  let me = { username, role: role || "student", id: null };
+  try {
+    const users = await api(R.users);
+    const found = users.find(u => u.username === username);
+    if (found) me = found;
+  } catch {}
+
+  pendingLoginChallenge = null;
+  pendingLoginUsername = null;
+  document.getElementById("loginCode").value = "";
+  show("loginCodeBox", false);
+
+  currentUser = me;
+  localStorage.setItem("inv_user", JSON.stringify(me));
+  showApp();
+}
+
 function logout() {
   token = null; currentUser = null;
+  pendingLoginChallenge = null;
+  pendingLoginUsername = null;
   localStorage.removeItem("inv_token");
   localStorage.removeItem("inv_user");
   show("appView", false);
   document.getElementById("loginView").style.display = "flex";
   document.getElementById("loginUser").value = "";
   document.getElementById("loginPass").value = "";
+  document.getElementById("loginCode").value = "";
+  show("loginCodeBox", false);
+}
+
+async function handleActivationLink() {
+  const params = new URLSearchParams(window.location.search);
+  const activationToken = params.get("token");
+  if (!activationToken || window.location.pathname !== "/activate") return;
+
+  try {
+    await api(R.activateUser(activationToken), { method: "POST" });
+    toast("Konto zostało aktywowane. Możesz się zalogować.", "success");
+    window.history.replaceState({}, "", "/");
+  } catch (e) {
+    toast("Nie udało się aktywować konta: " + e.message, "error");
+  }
+}
+
+async function changePassword() {
+  const current_password = document.getElementById("currentPassword").value;
+  const new_password = document.getElementById("newPassword").value;
+
+  if (!current_password || !new_password) return toast("Podaj aktualne i nowe hasło.", "error");
+  if (new_password.length < 8) return toast("Nowe hasło musi mieć min. 8 znaków.", "error");
+
+  try {
+    await api(R.changePassword, {
+      method: "POST",
+      body: JSON.stringify({ current_password, new_password })
+    });
+
+    document.getElementById("currentPassword").value = "";
+    document.getElementById("newPassword").value = "";
+    toast("Hasło zostało zmienione.", "success");
+  } catch (e) {
+    toast("Nie udało się zmienić hasła: " + e.message, "error");
+  }
 }
 
 /* ════════════════════════════════════
@@ -1018,6 +1116,7 @@ async function addUser() {
   if (password.length < 8) return toast("Hasło: min. 8 znaków.", "error");
   if (first_name.length < 2) return toast("Imię: min. 2 znaki.", "error");
   if (last_name.length < 2) return toast("Nazwisko: min. 2 znaki.", "error");
+  if (!email) return toast("Email jest wymagany.", "error");
 
   try {
     const u = await api(R.users, {
@@ -1077,10 +1176,13 @@ async function deleteUserById(id) {
 /* ════════════════════════════════════
    INIT
 ════════════════════════════════════ */
+handleActivationLink();
 if (token && currentUser) showApp();
 
 document.addEventListener("keydown", e => {
-  if (e.key === "Enter" && document.getElementById("loginView").style.display !== "none") login();
+  if (e.key !== "Enter" || document.getElementById("loginView").style.display === "none") return;
+  if (document.getElementById("loginCodeBox").style.display !== "none") verifyLoginCode();
+  else login();
 });
 </script>
 </body>

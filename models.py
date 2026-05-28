@@ -46,6 +46,22 @@ class User(Base):
     loans: Mapped[list["Loan"]] = relationship("Loan", back_populates="user", foreign_keys="Loan.user_id")
     loan_history: Mapped[list["LoanHistory"]] = relationship("LoanHistory", back_populates="user", foreign_keys="LoanHistory.user_id")
 
+
+class LoginCode(Base):
+    __tablename__ = "login_codes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    challenge_id: Mapped[str] = mapped_column(String(80), unique=True, index=True, nullable=False)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    code_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    used_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+    user: Mapped["User"] = relationship("User")
+
+
 class Item(Base):
     __tablename__ = 'items'
 

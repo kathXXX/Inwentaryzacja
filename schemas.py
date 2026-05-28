@@ -11,9 +11,27 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class LoginCodeRequest(BaseModel):
+    challenge_id: str
+    code: str = Field(min_length=4, max_length=12)
+
+
+class LoginCodeRead(BaseModel):
+    challenge_id: str
+    message: str
+    email: Optional[str] = None
+    expires_in_seconds: int
+    dev_code: Optional[str] = None
+
+
 class Token(BaseModel):
     access_token: str
     token_type: str
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8, max_length=128)
 
 
 class UserCreate(BaseModel):

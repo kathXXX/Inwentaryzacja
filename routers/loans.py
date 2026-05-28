@@ -1,10 +1,11 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 
 import models
 from database import db_dependency
 from models import ItemStatus
+from routers.email_service import send_loan_approved_email
 from schemas import LoanApprove, LoanHistoryRead, LoanRead, LoanRequest, LoanReturn, TeacherLoan
 from security import require_student, require_teacher
 
@@ -66,6 +67,7 @@ async def request_loan(
 )
 async def approve_loan(
     req: LoanApprove,
+    background_tasks: BackgroundTasks,
     db: db_dependency,
     current_user: models.User = Depends(require_teacher),
 ):
@@ -85,6 +87,15 @@ async def approve_loan(
     db.add(history)
     db.commit()
     db.refresh(loan)
+
+    if loan.user and loan.user.email and loan.item:
+        background_tasks.add_task(
+            send_loan_approved_email,
+            loan.user.email,
+            f"{loan.user.first_name} {loan.user.last_name}",
+            loan.item.nazwa,
+        )
+
     return loan
 
 

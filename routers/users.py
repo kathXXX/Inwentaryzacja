@@ -28,6 +28,9 @@ async def create_user(
     current_user: models.User = Depends(require_admin),
 
 ):
+    if not user.email:
+        raise HTTPException(status_code=400, detail="Email jest wymagany dla konta uzytkownika")
+
     activation_token = secrets.token_urlsafe(32)
     plain_password = user.password
 
@@ -60,7 +63,8 @@ async def create_user(
         )
     db.refresh(new_user)
 
-    activation_link = f"{os.getenv('FRONTEND_URL')}/activate?token={activation_token}"
+    frontend_url = os.getenv("FRONTEND_URL") or os.getenv("PUBLIC_FRONTEND_URL", "").rstrip("/")
+    activation_link = f"{frontend_url}/activate?token={activation_token}"
 
     try:
         await send_activation_email(
@@ -124,25 +128,25 @@ async def delete_user(
 
 
 
-    @router.post("/activate", summary="Aktywuj konto")
-    async def activate_user(
-        token: str,
-        db: db_dependency,
-    ):
-        user = db.query(models.User).filter(
-            models.User.activation_token == token
-        ).first()
+@router.post("/activate", summary="Aktywuj konto")
+async def activate_user(
+    token: str,
+    db: db_dependency,
+):
+    user = db.query(models.User).filter(
+        models.User.activation_token == token
+    ).first()
 
-        if not user:
-            raise HTTPException(status_code=400, detail="Nieprawidlowy token")
+    if not user:
+        raise HTTPException(status_code=400, detail="Nieprawidlowy token")
 
-        if user.activation_token_expires_at < datetime.utcnow():
-            raise HTTPException(status_code=400, detail="Token wygasl")
+    if user.activation_token_expires_at and user.activation_token_expires_at < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="Token wygasl")
 
-        user.is_active = True
-        user.activation_token = None
-        user.activation_token_expires_at = None
+    user.is_active = True
+    user.activation_token = None
+    user.activation_token_expires_at = None
 
-        db.commit()
+    db.commit()
 
-        return {"message": "Konto zostalo aktywowane"}
+    return {"message": "Konto zostalo aktywowane"}
