@@ -45,8 +45,8 @@ async def login(request: Request, data: LoginRequest, db: Session = Depends(get_
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Konto nie jest aktywne")
 
-    if not user.email:
-        raise HTTPException(status_code=400, detail="Uzytkownik nie ma przypisanego adresu email")
+    #if not user.email:
+        #raise HTTPException(status_code=400, detail="Uzytkownik nie ma przypisanego adresu email")
 
     now = datetime.utcnow()
     db.query(models.LoginCode).filter(
