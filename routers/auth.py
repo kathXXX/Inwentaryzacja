@@ -45,8 +45,8 @@ async def login(request: Request, data: LoginRequest, db: Session = Depends(get_
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Konto nie jest aktywne")
 
-    #if not user.email:
-        #raise HTTPException(status_code=400, detail="Uzytkownik nie ma przypisanego adresu email")
+    if not user.email:
+        raise HTTPException(status_code=400, detail="Uzytkownik nie ma przypisanego adresu email")
 
     now = datetime.utcnow()
     db.query(models.LoginCode).filter(
@@ -64,17 +64,17 @@ async def login(request: Request, data: LoginRequest, db: Session = Depends(get_
     db.add(challenge)
     db.commit()
 
-    #try:
-        #await send_login_code_email(user.email, code)
-    #except Exception as exc:
-        #challenge.used_at = datetime.utcnow()
-        #db.commit()
-        #raise HTTPException(status_code=500, detail="Nie udalo sie wyslac kodu logowania") from exc
+    try:
+        await send_login_code_email(user.email, code)
+    except Exception as exc:
+        challenge.used_at = datetime.utcnow()
+        db.commit()
+        raise HTTPException(status_code=500, detail="Nie udalo sie wyslac kodu logowania") from exc
 
     return LoginCodeRead(
         challenge_id=challenge.challenge_id,
         message="Kod logowania zostal wyslany na email",
-        #email=mask_email(user.email),
+        email=mask_email(user.email),
         expires_in_seconds=LOGIN_CODE_TTL_MINUTES * 60,
         dev_code=code if is_email_dev_mode() else None,
     )

@@ -1,7 +1,34 @@
 import os
 import resend
 
+async def send_email(to_email: str, subject: str, text: str):
+    print("EMAIL_SEND_START")
+    print("EMAIL_DEV_MODE =", os.getenv("EMAIL_DEV_MODE"))
+    print("RESEND_API_KEY exists =", bool(os.getenv("RESEND_API_KEY")))
+    print("SMTP_FROM =", os.getenv("SMTP_FROM"))
 
+    if not to_email:
+        raise ValueError("Adres email jest wymagany")
+
+    if is_email_dev_mode():
+        print(f"[EMAIL_DEV_MODE] To: {to_email}\nSubject: {subject}\n{text}")
+        return
+
+    resend.api_key = os.getenv("RESEND_API_KEY")
+
+    if not resend.api_key:
+        raise RuntimeError("RESEND_API_KEY is not set")
+
+    response = resend.Emails.send({
+        "from": os.getenv("SMTP_FROM", "onboarding@resend.dev"),
+        "to": to_email,
+        "subject": subject,
+        "text": text,
+    })
+
+    print("RESEND_RESPONSE =", response)
+
+    
 def is_email_dev_mode() -> bool:
     return os.getenv("EMAIL_DEV_MODE", "").lower() in {"1", "true", "yes", "on"}
 
