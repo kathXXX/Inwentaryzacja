@@ -74,7 +74,7 @@ async def login(request: Request, data: LoginRequest, db: Session = Depends(get_
     return LoginCodeRead(
         challenge_id=challenge.challenge_id,
         message="Kod logowania zostal wyslany na email",
-        email=mask_email(user.email),
+        #email=mask_email(user.email),
         expires_in_seconds=LOGIN_CODE_TTL_MINUTES * 60,
         dev_code=code if is_email_dev_mode() else None,
     )
