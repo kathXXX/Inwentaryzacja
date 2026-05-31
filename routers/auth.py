@@ -64,12 +64,12 @@ async def login(request: Request, data: LoginRequest, db: Session = Depends(get_
     db.add(challenge)
     db.commit()
 
-    try:
-        await send_login_code_email(user.email, code)
-    except Exception as exc:
-        challenge.used_at = datetime.utcnow()
-        db.commit()
-        raise HTTPException(status_code=500, detail="Nie udalo sie wyslac kodu logowania") from exc
+    #try:
+        #await send_login_code_email(user.email, code)
+    #except Exception as exc:
+        #challenge.used_at = datetime.utcnow()
+        #db.commit()
+        #raise HTTPException(status_code=500, detail="Nie udalo sie wyslac kodu logowania") from exc
 
     return LoginCodeRead(
         challenge_id=challenge.challenge_id,
