@@ -1,5 +1,17 @@
 const API_URL = "/api";
 
+function showTab(tabId) {
+    document.querySelectorAll(".tab-content").forEach(el => {
+        el.style.display = "none";
+    });
+
+    const active = document.getElementById(tabId);
+
+    if (active) {
+        active.style.display = "block";
+    }
+}
+
 // ------------------ UI RENDER ------------------
 
 function renderUI() {
@@ -116,55 +128,140 @@ function renderAdmin(app) {
     app.innerHTML = `
         <h2>Administrator</h2>
 
-        <button onclick="loadAvailability()">Dostępność</button>
-        <ul id="availability"></ul>
+<div class="tabs">
 
-        <h3>Oczekujące wnioski</h3>
-        <button onclick="loadPendingLoans()">Pokaż</button>
-        <ul id="pending"></ul>
+<button onclick="showTab('availabilityTab')">
+Dostępność
+</button>
 
-        <h3>Zatwierdź wniosek</h3>
-        <input id="approve_id" placeholder="Loan ID">
-        <button onclick="approveLoan()">Zatwierdź</button>
+<button onclick="showTab('loansTab')">
+Wypożyczenia
+</button>
 
-        <h3>Zwrot</h3>
-        <input id="return_id" placeholder="Loan ID">
-        <button onclick="returnLoan()">Zwróć</button>
+<button onclick="showTab('itemsTab')">
+Przedmioty
+</button>
 
-        <h3>Dodaj przedmiot</h3>
-        <input id="nazwa" placeholder="Nazwa">
-        <input id="kategoria" placeholder="Kategoria">
-        <input id="lokalizacja" placeholder="Lokalizacja">
-        <button onclick="addItem()">Dodaj</button>
+<button onclick="showTab('usersTab')">
+Użytkownicy
+</button>
 
-        <h3>Usuń przedmiot</h3>
-        <input id="delete_item_id" placeholder="Item ID">
-        <button onclick="deleteItem()">Usuń</button>
+</div>
 
-        <h3>QR kod</h3>
-        <input id="qr_item_id" placeholder="Item ID">
-        <button onclick="generateQR()">Generuj</button>
-        <br>
-        <img id="qr_img" width="200">
+<div id="availabilityTab" class="tab-content">
 
-        <h3>Użytkownicy</h3>
-        <button onclick="loadUsers()">Pokaż</button>
-        <ul id="users"></ul>
+<h3>Dostępność</h3>
 
-        <h3>Dodaj użytkownika</h3>
-        <input id="username" placeholder="Username">
-        <input id="password" placeholder="Password">
-        <select id="user_role">
-            <option value="student">student</option>
-            <option value="nauczyciel">nauczyciel</option>
-            <option value="administrator">administrator</option>
-        </select>
-        <button onclick="createUser()">Dodaj</button>
+<button onclick="loadAvailability()">
+Pokaż
+</button>
 
-        <h3>Usuń użytkownika</h3>
-        <input id="delete_user_id" placeholder="User ID">
-        <button onclick="deleteUser()">Usuń</button>
+<ul id="availability"></ul>
+
+</div>
+
+<div id="loansTab" class="tab-content" style="display:none">
+
+<h3>Wnioski</h3>
+
+<button onclick="loadPendingLoans()">
+Pokaż
+</button>
+
+<ul id="pending"></ul>
+
+<h3>Zatwierdź</h3>
+
+<input id="approve_id" placeholder="Loan ID">
+
+<button onclick="approveLoan()">
+Zatwierdź
+</button>
+
+<h3>Zwrot</h3>
+
+<input id="return_id" placeholder="Loan ID">
+
+<button onclick="returnLoan()">
+Zwróć
+</button>
+
+</div>
+
+<div id="itemsTab" class="tab-content" style="display:none">
+
+<h3>Dodaj przedmiot</h3>
+
+<input id="nazwa" placeholder="Nazwa">
+
+<input id="kategoria" placeholder="Kategoria">
+
+<input id="lokalizacja" placeholder="Lokalizacja">
+
+<button onclick="addItem()">
+Dodaj
+</button>
+
+<h3>Usuń przedmiot</h3>
+
+<input id="delete_item_id" placeholder="Item ID">
+
+<button onclick="deleteItem()">
+Usuń
+</button>
+
+<h3>QR</h3>
+
+<input id="qr_item_id" placeholder="Item ID">
+
+<button onclick="generateQR()">
+Generuj
+</button>
+
+<br>
+
+<img id="qr_img" width="200">
+
+</div>
+
+<div id="usersTab" class="tab-content" style="display:none">
+
+<h3>Lista użytkowników</h3>
+
+<button onclick="loadUsers()">
+Pokaż
+</button>
+
+<ul id="users"></ul>
+
+<h3>Dodaj użytkownika</h3>
+
+<input id="username" placeholder="Username">
+
+<input id="password" placeholder="Password">
+
+<select id="user_role">
+<option value="student">student</option>
+<option value="nauczyciel">nauczyciel</option>
+<option value="administrator">administrator</option>
+</select>
+
+<button onclick="createUser()">
+Dodaj
+</button>
+
+<h3>Usuń użytkownika</h3>
+
+<input id="delete_user_id" placeholder="User ID">
+
+<button onclick="deleteUser()">
+Usuń
+</button>
+
+</div>
     `;
+
+showTab("availabilityTab");
 }
 
 // ------------------ API CALLS ------------------
