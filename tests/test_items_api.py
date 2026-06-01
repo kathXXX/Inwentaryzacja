@@ -6,7 +6,7 @@ import models
 from database import get_db
 from main import app
 from security import require_admin
-
+import pytest
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test_items.db"
 
@@ -40,16 +40,20 @@ def fake_admin_user():
         is_active=True,
     )
 
-
-app.dependency_overrides[get_db] = override_get_db
-app.dependency_overrides[require_admin] = fake_admin_user
-
 client = TestClient(app)
 
+@pytest.fixture(autouse=True)
+def clean_database():
+    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[require_admin] = fake_admin_user
 
-def setup_function():
     models.Base.metadata.drop_all(bind=engine)
     models.Base.metadata.create_all(bind=engine)
+
+    yield
+
+    models.Base.metadata.drop_all(bind=engine)
+    app.dependency_overrides.clear()
 
 
 def test_create_item():
