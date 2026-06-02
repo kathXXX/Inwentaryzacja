@@ -703,6 +703,13 @@
           <h4>📋 Przedmioty &amp; Dostępność</h4>
           <button class="btn btn-ghost btn-sm ml-auto" onclick="loadAvailability()">↻ Odśwież</button>
         </div>
+        <div class="field">
+          <input
+            id="searchAvailability"
+            placeholder="Szukaj po ID, nazwie, kategorii, lokalizacji, statusie..."
+            oninput="filterRows('searchAvailability', '#availTbody tr')"
+          />
+        </div>
         <div class="table-wrap">
           <table>
             <thead>
@@ -755,6 +762,14 @@
         </div>
         <div id="pendingList" class="empty-state">Brak oczekujących wniosków.</div>
       </div>
+      
+      <div class="field">
+        <input
+          id="searchPending"
+          placeholder="Szukaj po Loan ID, przedmiocie, User ID..."
+          oninput="filterRows('searchPending', '.pending-row')"
+        />
+      </div>
 
     <!-- AKCJE NAUCZYCIELA — nauczyciel / admin -->
     <div class="section" id="sectionTeacher" style="display:none;">
@@ -790,6 +805,14 @@
       <div class="section-header">
         <h4>📚 Historia wypożyczeń [nauczyciel/admin]</h4>
         <button class="btn btn-ghost btn-sm ml-auto" onclick="loadHistory()">↻ Odśwież</button>
+      </div>
+
+      <div class="field">
+        <input
+          id="searchHistory"
+          placeholder="Szukaj po ID, Item ID, User ID, dacie..."
+          oninput="filterRows('searchHistory', '#historyTbody tr')"
+        />
       </div>
 
       <div class="table-wrap">
@@ -854,6 +877,15 @@
         <h4>👥 Użytkownicy [admin]</h4>
         <button class="btn btn-ghost btn-sm ml-auto" onclick="loadUsers()">↻ Odśwież</button>
       </div>
+
+      <div class="field">
+        <input
+          id="searchUsers"
+          placeholder="Szukaj po imieniu, nazwisku, username, emailu, roli..."
+          oninput="filterRows('searchUsers', '#usersTbody tr')"
+        />
+      </div>
+
       <div class="table-wrap">
         <table>
           <thead>
@@ -1045,6 +1077,14 @@
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
+    }
+
+    function filterRows(inputId, containerSelector) {
+      const query = document.getElementById(inputId).value.toLowerCase().trim();
+
+      document.querySelectorAll(containerSelector).forEach(row => {
+      const text = row.innerText.toLowerCase();
+      row.style.display = text.includes(query) ? "" : "none";});
     }
 
     /* ════════════════════════════════════
@@ -1349,7 +1389,7 @@
         const div = document.getElementById("pendingList");
         if (!loans.length) { div.innerHTML = `<span class="empty-state">Brak oczekujących wniosków.</span>`; return; }
         div.innerHTML = loans.map(l => `
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:0.55rem 0;border-bottom:1px solid var(--border);">
+      <div class="pending-row" style="display:flex;justify-content:space-between;align-items:center;padding:0.55rem 0;border-bottom:1px solid var(--border);">
         <span style="font-family:var(--mono);font-size:0.82rem;">
           Loan <strong>#${l.id}</strong> · ${l.item_name || "Przedmiot #" + l.item_id} · User #${l.user_id}
         </span>
