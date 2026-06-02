@@ -1234,14 +1234,119 @@
     async function handleActivationLink() {
       const params = new URLSearchParams(window.location.search);
       const activationToken = params.get("token");
+
       if (!activationToken || window.location.pathname !== "/activate") return;
 
+      document.body.innerHTML = `
+        <div style="
+          min-height:100vh;
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          background:#0f1117;
+          color:#e8ecf4;
+          font-family:IBM Plex Sans, sans-serif;
+          padding:20px;
+        ">
+          <div style="
+            background:#181c27;
+            border:1px solid #2a3150;
+            border-radius:14px;
+            padding:32px;
+            max-width:420px;
+            width:100%;
+            text-align:center;
+          ">
+            <h1 style="color:#4f8ef7;margin-bottom:12px;">Aktywacja konta</h1>
+            <p>Trwa aktywowanie konta...</p>
+          </div>
+        </div>
+      `;
+
       try {
-        await api(R.activateUser(activationToken), { method: "POST" });
-        toast("Konto zostało aktywowane. Możesz się zalogować.", "success");
-        window.history.replaceState({}, "", "/");
+        const res = await fetch(`/api/users/activate?token=${encodeURIComponent(activationToken)}`, {
+          method: "POST"
+        });
+
+        if (!res.ok) {
+          let detail = "Link aktywacyjny jest nieprawidłowy albo wygasł.";
+          try {
+            const data = await res.json();
+            detail = data.detail || detail;
+          } catch {}
+
+          throw new Error(detail);
+        }
+
+        document.body.innerHTML = `
+          <div style="
+            min-height:100vh;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            background:#0f1117;
+            color:#e8ecf4;
+            font-family:IBM Plex Sans, sans-serif;
+            padding:20px;
+          ">
+            <div style="
+              background:#181c27;
+              border:1px solid #2a3150;
+              border-radius:14px;
+              padding:32px;
+              max-width:420px;
+              width:100%;
+              text-align:center;
+            ">
+              <h1 style="color:#3ecf8e;margin-bottom:12px;">Konto aktywowane</h1>
+              <p style="margin-bottom:24px;">Możesz teraz zalogować się do systemu.</p>
+              <a href="/" style="
+                display:inline-block;
+                background:#4f8ef7;
+                color:white;
+                padding:10px 18px;
+                border-radius:8px;
+                text-decoration:none;
+                font-weight:600;
+              ">Przejdź do logowania</a>
+            </div>
+          </div>
+        `;
       } catch (e) {
-        toast("Nie udało się aktywować konta: " + e.message, "error");
+        document.body.innerHTML = `
+          <div style="
+            min-height:100vh;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            background:#0f1117;
+            color:#e8ecf4;
+            font-family:IBM Plex Sans, sans-serif;
+            padding:20px;
+          ">
+            <div style="
+              background:#181c27;
+              border:1px solid #2a3150;
+              border-radius:14px;
+              padding:32px;
+              max-width:420px;
+              width:100%;
+              text-align:center;
+            ">
+              <h1 style="color:#f75c5c;margin-bottom:12px;">Błąd aktywacji</h1>
+              <p style="margin-bottom:24px;">${e.message}</p>
+              <a href="/" style="
+                display:inline-block;
+                background:#4f8ef7;
+                color:white;
+                padding:10px 18px;
+                border-radius:8px;
+                text-decoration:none;
+                font-weight:600;
+              ">Wróć do logowania</a>
+            </div>
+          </div>
+        `;
       }
     }
 
