@@ -632,7 +632,7 @@
   <!-- ══ LOGIN ══ -->
   <div id="loginView">
     <div class="login-logo">inventory<span>.app</span></div>
-    <div class="login-sub">// Railway · FastAPI · PostgreSQL</div>
+    <div class="login-sub">// - - - - - - - </div>
     <div class="card">
       <div class="card-title">Logowanie</div>
       <div class="field">
@@ -755,22 +755,24 @@
       </div>
 
       <!-- OCZEKUJĄCE WNIOSKI — nauczyciel / admin -->
+       
       <div class="section" id="sectionPending" style="display:none;">
         <div class="section-header">
           <h4>🕐 Oczekujące wnioski</h4>
           <button class="btn btn-ghost btn-sm ml-auto" onclick="loadPending()">↻ Odśwież</button>
         </div>
+        <div class="field">
+          <input
+            id="searchPending"
+            placeholder="Szukaj po Loan ID, przedmiocie, User ID..."
+            oninput="filterRows('searchPending', '.pending-row')"
+          />
+        </div>
+
         <div id="pendingList" class="empty-state">Brak oczekujących wniosków.</div>
       </div>
-      
-      <div class="field">
-        <input
-          id="searchPending"
-          placeholder="Szukaj po Loan ID, przedmiocie, User ID..."
-          oninput="filterRows('searchPending', '.pending-row')"
-        />
-      </div>
 
+      
     <!-- AKCJE NAUCZYCIELA — nauczyciel / admin -->
     <div class="section" id="sectionTeacher" style="display:none;">
       <div class="section-header">
@@ -968,7 +970,7 @@
 
 
 
-    <footer>© 2026 inventory.app · Railway + FastAPI + PostgreSQL + JWT</footer>
+    <footer>© 2026 inventory.app ·</footer>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
