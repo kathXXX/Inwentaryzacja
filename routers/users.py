@@ -1,19 +1,22 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, status
 
 from sqlalchemy.exc import IntegrityError
 
 import models
 from database import db_dependency
-from schemas import UserCreate, UserRead
-from security import hash_password, require_admin, require_teacher
+from schemas import ActivationCodeRequest, UserCreate, UserRead
+from security import hash_password, require_admin, require_teacher, verify_password
 
-import os
 import secrets
 from datetime import datetime, timedelta
 from routers.email_service import send_activation_email
 
 
 router = APIRouter(prefix="/users", tags=["Uzytkownicy"])
+
+
+def generate_activation_code() -> str:
+    return f"{secrets.randbelow(1_000_000):06d}"
 
 
 @router.post(
@@ -31,7 +34,7 @@ async def create_user(
     if not user.email:
         raise HTTPException(status_code=400, detail="Email jest wymagany dla konta uzytkownika")
 
-    activation_token = secrets.token_urlsafe(32)
+    activation_code = generate_activation_code()
     plain_password = user.password
 
     new_user = models.User(
@@ -47,7 +50,7 @@ async def create_user(
         student_index=user.student_index,
         department=user.department,
         is_active=False,
-        activation_token=activation_token,
+        activation_token=hash_password(activation_code),
         activation_token_expires_at=datetime.utcnow() + timedelta(hours=24),
     )
 
@@ -63,15 +66,12 @@ async def create_user(
         )
     db.refresh(new_user)
 
-    frontend_url = os.getenv("FRONTEND_URL") or os.getenv("PUBLIC_FRONTEND_URL", "").rstrip("/")
-    activation_link = f"{frontend_url}/?activate=1&token={activation_token}"
-
     try:
         await send_activation_email(
             to_email=user.email,
             username=user.username,
             password=plain_password,
-            activation_link=activation_link,
+            activation_code=activation_code,
         )
     except Exception as e:
         print(f"Nie udalo sie wyslac maila aktywacyjnego: {e}")
@@ -130,18 +130,37 @@ async def delete_user(
 
 @router.post("/activate", summary="Aktywuj konto")
 async def activate_user(
-    token: str,
     db: db_dependency,
+    data: ActivationCodeRequest | None = Body(default=None),
+    token: str | None = None,
 ):
-    user = db.query(models.User).filter(
-        models.User.activation_token == token
-    ).first()
+    activation_by_code = data is not None
+
+    if data:
+        user = db.query(models.User).filter(models.User.username == data.username).first()
+    elif token:
+        user = db.query(models.User).filter(models.User.activation_token == token).first()
+    else:
+        raise HTTPException(status_code=400, detail="Podaj kod aktywacji")
 
     if not user:
-        raise HTTPException(status_code=400, detail="Nieprawidlowy token")
+        detail = "Nieprawidlowy kod aktywacji" if activation_by_code else "Nieprawidlowy token"
+        raise HTTPException(status_code=400, detail=detail)
+
+    if user.is_active:
+        return {"message": "Konto jest juz aktywne"}
+
+    if data:
+        try:
+            code_ok = bool(user.activation_token and verify_password(data.code, user.activation_token))
+        except Exception:
+            code_ok = False
+
+        if not code_ok:
+            raise HTTPException(status_code=400, detail="Nieprawidlowy kod aktywacji")
 
     if user.activation_token_expires_at and user.activation_token_expires_at < datetime.utcnow():
-        raise HTTPException(status_code=400, detail="Token wygasl")
+        raise HTTPException(status_code=400, detail="Kod aktywacji wygasl")
 
     user.is_active = True
     user.activation_token = None

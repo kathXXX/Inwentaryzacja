@@ -43,11 +43,11 @@ async def send_activation_email(
     to_email: str,
     username: str,
     password: str,
-    activation_link: str,
+    activation_code: str,
 ):
     await send_email(
         to_email,
-        "Aktywacja konta",
+        "Kod aktywacji konta",
         f"""
 Czesc,
 
@@ -56,24 +56,9 @@ utworzono dla Ciebie konto w systemie inwentaryzacji.
 Login: {username}
 Haslo: {password}
 
-Kliknij link, aby aktywowac konto:
-{activation_link}
+Kod aktywacji konta: {activation_code}
 
-Link jest wazny 24 godziny.
-"""
-    )
-
-
-async def send_login_code_email(to_email: str, code: str):
-    await send_email(
-        to_email,
-        "Kod logowania do systemu inwentaryzacji",
-        f"""
-Czesc,
-
-Twoj kod logowania to: {code}
-
-Kod jest wazny przez 10 minut. Jesli to nie Ty probujesz sie zalogowac, zignoruj te wiadomosc.
+Kod jest wazny 24 godziny. Wpisz go na stronie logowania, aby aktywowac konto.
 """
     )
 
@@ -82,7 +67,9 @@ async def send_loan_approved_email(
     to_email: str,
     user_name: str,
     item_name: str,
+    due_at: str | None = None,
 ):
+    due_text = f"\nTermin zwrotu: {due_at}\n" if due_at else ""
     await send_email(
         to_email,
         "Wypozyczenie zostalo zaakceptowane",
@@ -90,8 +77,28 @@ async def send_loan_approved_email(
 Czesc {user_name},
 
 Twoje wypozyczenie sprzetu "{item_name}" zostalo zaakceptowane.
+{due_text}
 
 Mozesz odebrac sprzet zgodnie z ustaleniami w systemie inwentaryzacji.
+"""
+    )
+
+
+async def send_loan_due_reminder_email(
+    to_email: str,
+    user_name: str,
+    item_name: str,
+    due_at: str,
+):
+    await send_email(
+        to_email,
+        "Przypomnienie o zwrocie sprzetu",
+        f"""
+Czesc {user_name},
+
+Przypominamy, ze sprzet "{item_name}" ma termin zwrotu: {due_at}.
+
+Ta wiadomosc jest wysylana tylko do studenta, ktory wypozyczyl sprzet.
 """
     )
 

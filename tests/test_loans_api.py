@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -102,12 +104,14 @@ def create_item_and_loan(status=models.ItemStatus.dostepny, user_id=None):
 def test_request_loan_success():
     item_id, loan_id = create_item_and_loan()
 
-    response = client.post("/loans/request/", json={"item_id": item_id})
+    due_at = (datetime.utcnow() + timedelta(days=7)).replace(microsecond=0).isoformat()
+    response = client.post("/loans/request/", json={"item_id": item_id, "due_at": due_at})
 
     assert response.status_code == 201
     assert response.json()["item_id"] == item_id
     assert response.json()["status"] == "zarezerwowany"
     assert response.json()["user_id"] == 1
+    assert response.json()["due_at"].startswith(due_at)
 
 
 def test_request_loan_item_not_found():
@@ -153,11 +157,20 @@ def test_approve_loan_success():
         user_id=1,
     )
 
-    response = client.post("/loans/approve/", json={"loan_id": loan_id})
+    due_at = (datetime.utcnow() + timedelta(days=7)).replace(microsecond=0).isoformat()
+    response = client.post("/loans/approve/", json={"loan_id": loan_id, "due_at": due_at})
 
     assert response.status_code == 200
     assert response.json()["status"] == "wypozyczony"
     assert response.json()["user_id"] == 1
+    assert response.json()["due_at"].startswith(due_at)
+
+    db = TestingSessionLocal()
+    history = db.query(models.LoanHistory).filter(models.LoanHistory.item_id == item_id).first()
+    db.close()
+
+    assert history is not None
+    assert history.due_at.isoformat().startswith(due_at)
 
 
 def test_approve_loan_not_found():

@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from schemas import LoginRequest, LoginCodeRequest, ChangePasswordRequest, UserCreate
+from schemas import LoginRequest, ChangePasswordRequest, UserCreate
 from models import UserRole
 
 
@@ -10,23 +10,6 @@ def test_login_request_valid():
 
     assert data.username == "admin"
     assert data.password == "password123"
-
-
-def test_login_code_request_valid():
-    data = LoginCodeRequest(challenge_id="abc123", code="123456")
-
-    assert data.challenge_id == "abc123"
-    assert data.code == "123456"
-
-
-def test_login_code_too_short():
-    with pytest.raises(ValidationError):
-        LoginCodeRequest(challenge_id="abc123", code="123")
-
-
-def test_login_code_too_long():
-    with pytest.raises(ValidationError):
-        LoginCodeRequest(challenge_id="abc123", code="1234567890123")
 
 
 def test_change_password_valid():

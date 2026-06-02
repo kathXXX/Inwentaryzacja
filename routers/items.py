@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 import models
 from database import db_dependency
 from models import ItemStatus
+from routers.location_service import get_or_create_location, item_location_name
 from schemas import ItemBulkCreate, ItemCreate, ItemQrRead, ItemRead
 from security import require_admin
 
@@ -165,7 +166,15 @@ def build_qr_label_pdf(items: list[models.Item]) -> io.BytesIO:
 
 
 def create_item_with_loan(db: Session, item_data: ItemCreate) -> models.Item:
-    db_item = models.Item(**item_data.model_dump(), qr_code=generate_unique_qr_code(db))
+    data = item_data.model_dump()
+    location = get_or_create_location(db, data["lokalizacja"])
+    data["lokalizacja"] = location.name
+
+    db_item = models.Item(
+        **data,
+        location_id=location.id,
+        qr_code=generate_unique_qr_code(db),
+    )
     db.add(db_item)
     db.flush()
 
@@ -258,10 +267,13 @@ async def read_item_by_qr(qr_code: str, db: db_dependency):
         item_id=item.id,
         nazwa=item.nazwa,
         kategoria=item.kategoria,
-        lokalizacja=item.lokalizacja,
+        lokalizacja=item_location_name(item),
+        location_id=item.location_id,
         qr_code=item.qr_code,
         loan_id=loan.id,
         status=loan.status,
+        user_id=loan.user_id,
+        due_at=loan.due_at,
     )
 
 

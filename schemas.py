@@ -11,11 +11,6 @@ class LoginRequest(BaseModel):
     password: str
 
 
-class LoginCodeRequest(BaseModel):
-    challenge_id: str
-    code: str = Field(min_length=4, max_length=12)
-
-
 class LoginCodeRead(BaseModel):
     challenge_id: str
     message: str
@@ -32,6 +27,11 @@ class Token(BaseModel):
 class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str = Field(min_length=8, max_length=128)
+
+
+class ActivationCodeRequest(BaseModel):
+    username: str = Field(min_length=3, max_length=50)
+    code: str = Field(min_length=4, max_length=12)
 
 
 class UserCreate(BaseModel):
@@ -77,11 +77,19 @@ class ItemBulkCreate(BaseModel):
     lokalizacja: str = Field(min_length=1, max_length=100)
 
 
+class LocationRead(BaseModel):
+    id: int
+    name: str
+    description: Optional[str] = None
+    items_count: int = 0
+
+
 class ItemRead(BaseModel):
     id: int
     nazwa: str
     kategoria: str
     lokalizacja: str
+    location_id: Optional[int] = None
     qr_code: str
 
     class Config:
@@ -93,10 +101,12 @@ class ItemQrRead(BaseModel):
     nazwa: str
     kategoria: str
     lokalizacja: str
+    location_id: Optional[int] = None
     qr_code: str
     loan_id: Optional[int]
     status: ItemStatus
     user_id: Optional[int] = None
+    due_at: Optional[datetime] = None
 
 
 class LoanRead(BaseModel):
@@ -105,6 +115,7 @@ class LoanRead(BaseModel):
     item_name: Optional[str] = None
     status: ItemStatus
     user_id: Optional[int]
+    due_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -112,10 +123,12 @@ class LoanRead(BaseModel):
 
 class LoanRequest(BaseModel):
     item_id: int
+    due_at: Optional[datetime] = None
 
 
 class LoanApprove(BaseModel):
     loan_id: int
+    due_at: Optional[datetime] = None
 
 
 class LoanReturn(BaseModel):
@@ -124,6 +137,7 @@ class LoanReturn(BaseModel):
 
 class TeacherLoan(BaseModel):
     item_id: int
+    due_at: Optional[datetime] = None
 
 
 class AvailabilityRead(BaseModel):
@@ -133,6 +147,7 @@ class AvailabilityRead(BaseModel):
     kategoria: Optional[str] = None
     lokalizacja: Optional[str] = None
     status: ItemStatus
+    due_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -143,6 +158,7 @@ class LoanHistoryRead(BaseModel):
     item_id: int
     user_id: int
     borrowed_at: datetime
+    due_at: Optional[datetime]
     returned_at: Optional[datetime]
     approved_by_id: Optional[int]
     returned_by_id: Optional[int]
@@ -159,3 +175,51 @@ class PasswordResetConfirm(BaseModel):
     challenge_id: str
     code: str = Field(min_length=4, max_length=12)
     new_password: str = Field(min_length=8, max_length=128)
+
+
+class LocationInventoryCheckRequest(BaseModel):
+    location_id: Optional[int] = None
+    location_name: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    qr_codes: list[str] = Field(default_factory=list, max_length=500)
+
+
+class InventoryCheckItem(BaseModel):
+    item_id: int
+    nazwa: str
+    kategoria: str
+    lokalizacja: str
+    location_id: Optional[int] = None
+    qr_code: str
+    loan_id: Optional[int] = None
+    status: ItemStatus
+    user_id: Optional[int] = None
+    due_at: Optional[datetime] = None
+    scanned: bool = False
+
+
+class WrongLocationItem(InventoryCheckItem):
+    expected_location: str
+    checked_location: str
+    message: str
+
+
+class LocationInventoryCheckRead(BaseModel):
+    location: LocationRead
+    scanned_count: int
+    expected_count: int
+    present_count: int
+    missing_count: int
+    wrong_location_count: int
+    unknown_codes: list[str]
+    present_items: list[InventoryCheckItem]
+    missing_items: list[InventoryCheckItem]
+    wrong_location_items: list[WrongLocationItem]
+
+
+class DueReminderRequest(BaseModel):
+    days: int = Field(default=1, ge=0, le=30)
+
+
+class DueReminderRead(BaseModel):
+    sent: int
+    skipped: int

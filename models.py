@@ -62,6 +62,17 @@ class LoginCode(Base):
     user: Mapped["User"] = relationship("User")
 
 
+class Location(Base):
+    __tablename__ = "locations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(100), unique=True, index=True, nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+    items: Mapped[list["Item"]] = relationship("Item", back_populates="location")
+
+
 class Item(Base):
     __tablename__ = 'items'
 
@@ -69,8 +80,10 @@ class Item(Base):
     nazwa: Mapped[str] = mapped_column(String(100), nullable=False)
     kategoria: Mapped[str] = mapped_column(String(100), nullable=False)
     lokalizacja: Mapped[str] = mapped_column(String(100), nullable=False)
+    location_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("locations.id"), nullable=True)
     qr_code: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
 
+    location: Mapped[Optional["Location"]] = relationship("Location", back_populates="items")
     loan: Mapped[Optional["Loan"]] = relationship("Loan", back_populates="item", uselist=False)
 
 
@@ -81,6 +94,8 @@ class Loan(Base):
     item_id: Mapped[int] = mapped_column(Integer, ForeignKey('items.id'), unique=True)
     status: Mapped[ItemStatus] = mapped_column(Enum(ItemStatus), default=ItemStatus.dostepny)
     user_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey('users.id'), nullable=True)
+    due_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    due_reminder_sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     item: Mapped["Item"] = relationship("Item", back_populates="loan")
     user: Mapped[Optional["User"]] = relationship("User", back_populates="loans", foreign_keys=[user_id])
@@ -95,6 +110,7 @@ class LoanHistory(Base):
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
 
     borrowed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    due_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     returned_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     approved_by_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)

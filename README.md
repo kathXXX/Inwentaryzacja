@@ -13,7 +13,7 @@ Aplikacja webowa umożliwiająca zarządzanie sprzętem, użytkownikami oraz pro
 
 * rejestracja użytkowników przez administratora,
 * aktywacja konta przez link wysłany e-mailem,
-* logowanie dwuetapowe (hasło + kod e-mail),
+* logowanie loginem i hasłem,
 * zmiana hasła,
 * role użytkowników:
 

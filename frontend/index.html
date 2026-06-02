@@ -652,6 +652,28 @@
         Nie pamiętasz hasła?
       </button>
 
+      <button class="btn btn-ghost btn-full" type="button" onclick="showActivationBox()">
+        Aktywuj konto kodem
+      </button>
+
+      <div id="activationBox" style="display:none;margin-top:1rem;">
+        <hr class="div" />
+
+        <div class="field">
+          <label>Username</label>
+          <input type="text" id="activationUsername" placeholder="username" autocomplete="username" />
+        </div>
+
+        <div class="field">
+          <label>Kod z emaila</label>
+          <input type="text" id="activationCode" placeholder="000000" inputmode="numeric" autocomplete="one-time-code" />
+        </div>
+
+        <button class="btn btn-success btn-full" type="button" onclick="activateAccountCode()">
+          Aktywuj konto
+        </button>
+      </div>
+
       <div id="passwordResetBox" style="display:none;margin-top:1rem;">
         <hr class="div" />
 
@@ -686,14 +708,6 @@
         </div>
       </div>
 
-      <div id="loginCodeBox" style="display:none;margin-top:1rem;">
-        <hr class="div" />
-        <div class="field">
-          <label>Kod z emaila</label>
-          <input type="text" id="loginCode" placeholder="000000" inputmode="numeric" autocomplete="one-time-code" />
-        </div>
-        <button class="btn btn-success btn-full" id="loginCodeBtn" onclick="verifyLoginCode()">Potwierdź kod</button>
-      </div>
     </div>
   </div>
   <!-- ══ APP ══ -->
@@ -760,13 +774,14 @@
                 <th>Kategoria</th>
                 <th>Lokalizacja</th>
                 <th>Status</th>
+                <th>Termin</th>
                 <th>Użytkownik</th>
                 <th>Akcja</th>
               </tr>
             </thead>
             <tbody id="availTbody">
               <tr>
-                <td colspan="7" class="empty-state">Ładowanie…</td>
+                <td colspan="8" class="empty-state">Ładowanie…</td>
               </tr>
             </tbody>
           </table>
@@ -791,6 +806,7 @@
         </p>
         <div class="row">
           <input type="number" id="studentItemId" placeholder="ID przedmiotu" min="1" />
+          <input type="datetime-local" id="studentDueAt" title="Termin zwrotu" />
           <button class="btn btn-primary" onclick="studentRequest()">Złóż wniosek</button>
         </div>
       </div>
@@ -823,6 +839,7 @@
       <label style="margin-bottom:0.4rem;">Wypożycz przedmiot dla siebie (bezpośrednio)</label>
       <div class="row" style="margin-bottom:0.5rem;">
         <input type="number" id="teacherItemId" placeholder="ID przedmiotu" min="1" />
+        <input type="datetime-local" id="teacherDueAt" title="Termin zwrotu" />
         <button class="btn btn-warning" onclick="teacherLoan()">Wypożycz dla siebie</button>
       </div>
 
@@ -831,7 +848,16 @@
       <label style="margin-bottom:0.4rem;">Zatwierdź wniosek studenta</label>
       <div class="row" style="margin-bottom:0.5rem;">
         <input type="number" id="approveLoanId" placeholder="Loan ID" min="1" />
+        <input type="datetime-local" id="approveDueAt" title="Nadpisz termin zwrotu" />
         <button class="btn btn-success" onclick="approveLoan()">Zatwierdź</button>
+      </div>
+
+      <hr class="div" />
+
+      <label style="margin-bottom:0.4rem;">Powiadom studentów o zbliżającym się terminie zwrotu</label>
+      <div class="row" style="margin-bottom:0.5rem;">
+        <input type="number" id="reminderDays" min="0" max="30" value="1" />
+        <button class="btn btn-ghost" onclick="sendDueReminders()">Wyślij przypomnienia</button>
       </div>
 
       <hr class="div" />
@@ -866,6 +892,7 @@
               <th>Item ID</th>
               <th>User ID</th>
               <th>Wypożyczono</th>
+              <th>Termin</th>
               <th>Zwrócono</th>
               <th>Zatwierdził</th>
               <th>Przyjął zwrot</th>
@@ -873,7 +900,7 @@
           </thead>
           <tbody id="historyTbody">
             <tr>
-              <td colspan="7" class="empty-state">Brak historii.</td>
+              <td colspan="8" class="empty-state">Brak historii.</td>
             </tr>
           </tbody>
         </table>
@@ -1007,6 +1034,31 @@
         <div id="qrScanStatus" class="scan-status"></div>
         <div id="qrResult" class="qr-result"></div>
       </div>
+
+      <div class="section" id="sectionRoomInventory" style="display:none;">
+        <div class="section-header">
+          <h4>Inwentaryzacja sali QR</h4>
+          <button class="btn btn-ghost btn-sm ml-auto" onclick="loadLocations()">Odśwież sale</button>
+        </div>
+        <div class="row">
+          <input type="text" id="scanLocationName" list="locationsList" placeholder="Sala / lokalizacja" />
+          <datalist id="locationsList"></datalist>
+          <button class="btn btn-ghost" onclick="refreshRoomInventory()">Sprawdź salę</button>
+          <button class="btn btn-danger" onclick="resetRoomInventory()">Wyczyść skany</button>
+        </div>
+        <hr class="div" />
+        <div class="row">
+          <input type="text" id="roomQrCode" placeholder="Kod QR przedmiotu lub link z QR" />
+          <button class="btn btn-primary" onclick="addRoomScanFromInput()">Dodaj skan</button>
+        </div>
+        <div class="row qr-upload">
+          <label class="btn btn-ghost" for="roomQrFileInput">Wczytaj zdjęcie QR przedmiotu</label>
+          <input class="file-input" type="file" id="roomQrFileInput" accept="image/*" onchange="scanRoomQrFile(event)" />
+        </div>
+        <div id="roomScanStatus" class="scan-status"></div>
+        <div id="roomScanSummary" class="scan-status"></div>
+        <div id="roomScanResult" class="qr-result"></div>
+      </div>
     </div> <!-- END QR TAB -->
 
 
@@ -1023,15 +1075,17 @@
 
     const R = {
       login: `${BASE}/login`,
-      loginVerify: `${BASE}/login/verify`,
       changePassword: `${BASE}/change-password`,
       passwordResetRequest: `${BASE}/password-reset/request`,
       passwordResetConfirm: `${BASE}/password-reset/confirm`,
+      activateUser: `${BASE}/users/activate`,
       items: `${BASE}/items/`,
       itemsBulkPdf: `${BASE}/items/bulk/pdf`,
       item: id => `${BASE}/items/${id}`,
       itemQr: id => `${BASE}/items/${id}/qr`,
       itemQrLookup: code => `${BASE}/items/qr/${encodeURIComponent(code)}`,
+      locations: `${BASE}/locations/`,
+      inventoryCheck: `${BASE}/locations/inventory-check/`,
       availability: `${BASE}/availability/`,
       availabilityDetail: `${BASE}/availability/details/`,
       loansPending: `${BASE}/loans/pending/`,
@@ -1039,9 +1093,9 @@
       loansApprove: `${BASE}/loans/approve/`,
       loansTeacher: `${BASE}/loans/teacher/`,
       loansReturn: `${BASE}/loans/return/`,
+      loansDueReminders: `${BASE}/loans/reminders/due/`,
       users: `${BASE}/users/`,
       user: id => `${BASE}/users/${id}`,
-      activateUser: token => `${BASE}/users/activate?token=${encodeURIComponent(token)}`,
       loansHistory: `${BASE}/loans/history/`
     };
 
@@ -1051,9 +1105,8 @@
     let token = localStorage.getItem("inv_token") || null;
     let currentUser = JSON.parse(localStorage.getItem("inv_user") || "null");
     let currentQrCode = new URLSearchParams(window.location.search).get("qr") || null;
-    let pendingLoginChallenge = null;
-    let pendingLoginUsername = null;
     let pendingPasswordResetChallenge = null;
+    let roomScanCodes = [];
 
     /* ════════════════════════════════════
        UTILS
@@ -1146,47 +1199,19 @@
       btn.innerHTML = `<span class="spinner"></span>Logowanie…`;
 
       try {
-        /* POST /login — sends a one-time email code. */
+        /* POST /login — returns JWT after username/password validation. */
         const data = await api(R.login, {
           method: "POST",
           body: JSON.stringify({ username, password })
         });
 
-        pendingLoginChallenge = data.challenge_id;
-        pendingLoginUsername = username;
-        show("loginCodeBox", true);
-        document.getElementById("loginCode").focus();
-
-        const devMsg = data.dev_code ? ` Kod testowy: ${data.dev_code}` : "";
-        toast(`${data.message || "Kod wysłany"}${data.email ? " na " + data.email : ""}.${devMsg}`, "success");
+        await finishLogin(data.access_token, username);
+        toast("Zalogowano.", "success");
       } catch (e) {
         toast(e.message || "Nieprawidłowe dane logowania.", "error");
       } finally {
         btn.disabled = false;
         btn.textContent = "Zaloguj";
-      }
-    }
-
-    async function verifyLoginCode() {
-      const code = document.getElementById("loginCode").value.trim();
-      if (!pendingLoginChallenge || !code) return toast("Podaj kod z emaila.", "error");
-
-      const btn = document.getElementById("loginCodeBtn");
-      btn.disabled = true;
-      btn.innerHTML = `<span class="spinner"></span>Sprawdzam…`;
-
-      try {
-        const data = await api(R.loginVerify, {
-          method: "POST",
-          body: JSON.stringify({ challenge_id: pendingLoginChallenge, code })
-        });
-
-        await finishLogin(data.access_token, pendingLoginUsername || document.getElementById("loginUser").value.trim());
-      } catch (e) {
-        toast("Błąd kodu: " + e.message, "error");
-      } finally {
-        btn.disabled = false;
-        btn.textContent = "Potwierdź kod";
       }
     }
 
@@ -1207,11 +1232,6 @@
         if (found) me = found;
       } catch { }
 
-      pendingLoginChallenge = null;
-      pendingLoginUsername = null;
-      document.getElementById("loginCode").value = "";
-      show("loginCodeBox", false);
-
       currentUser = me;
       localStorage.setItem("inv_user", JSON.stringify(me));
       showApp();
@@ -1219,16 +1239,58 @@
 
     function logout() {
       token = null; currentUser = null;
-      pendingLoginChallenge = null;
-      pendingLoginUsername = null;
+      pendingPasswordResetChallenge = null;
+      resetQrState();
       localStorage.removeItem("inv_token");
       localStorage.removeItem("inv_user");
       show("appView", false);
       document.getElementById("loginView").style.display = "flex";
       document.getElementById("loginUser").value = "";
       document.getElementById("loginPass").value = "";
-      document.getElementById("loginCode").value = "";
-      show("loginCodeBox", false);
+    }
+
+    function resetQrState() {
+      currentQrCode = null;
+      roomScanCodes = [];
+
+      [
+        "qrLookupCode",
+        "qrScanStatus",
+        "scanLocationName",
+        "roomQrCode",
+        "roomScanStatus",
+        "roomScanSummary"
+      ].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value !== undefined ? el.value = "" : el.textContent = "";
+      });
+
+      ["qrResult", "roomScanResult"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.innerHTML = "";
+          el.style.display = "none";
+        }
+      });
+
+      ["qrImg", "qrPreview"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.removeAttribute("src");
+          el.style.display = "none";
+        }
+      });
+
+      ["qrFileInput", "roomQrFileInput"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = "";
+      });
+
+      const url = new URL(window.location.href);
+      if (url.searchParams.has("qr")) {
+        url.searchParams.delete("qr");
+        window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+      }
     }
 
     async function handleActivationLink() {
@@ -1377,6 +1439,34 @@
       box.style.display = box.style.display === "none" ? "block" : "none";
     }
 
+    function showActivationBox() {
+      const box = document.getElementById("activationBox");
+      box.style.display = box.style.display === "none" ? "block" : "none";
+    }
+
+    async function activateAccountCode() {
+      const username = document.getElementById("activationUsername").value.trim();
+      const code = document.getElementById("activationCode").value.trim();
+
+      if (!username || !code) {
+        return toast("Podaj username i kod aktywacji.", "error");
+      }
+
+      try {
+        const data = await api(R.activateUser, {
+          method: "POST",
+          body: JSON.stringify({ username, code })
+        });
+
+        document.getElementById("activationUsername").value = "";
+        document.getElementById("activationCode").value = "";
+        document.getElementById("activationBox").style.display = "none";
+        toast(data.message || "Konto aktywowane. Mozesz sie zalogowac.", "success");
+      } catch (e) {
+        toast("Nie udalo sie aktywowac konta: " + e.message, "error");
+      }
+    }
+
     async function requestPasswordReset() {
       const email = document.getElementById("resetEmail").value.trim();
 
@@ -1466,10 +1556,12 @@
       show("sectionStudent", isStud);
       show("sectionItems", isAdmin);
       show("sectionUsers", isAdmin);
+      show("sectionRoomInventory", isTeach);
 
       loadAvailability();
       if (isTeach) loadPending();
       if (isTeach) loadHistory();
+      if (isTeach) loadLocations();
       if (isAdmin) loadUsers();
       if (currentQrCode) lookupQr(currentQrCode, { silent: true });
     }
@@ -1478,15 +1570,21 @@
       return new Date(d).toLocaleString("pl-PL");
     }
 
+    function localDateTimeToIso(id) {
+      const value = document.getElementById(id)?.value;
+      if (!value) return null;
+      return new Date(value).toISOString();
+    }
+
     async function loadHistory() {
       const tbody = document.getElementById("historyTbody");
-      tbody.innerHTML = `<tr><td colspan="7" class="empty-state">Ładowanie…</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" class="empty-state">Ładowanie…</td></tr>`;
 
       try {
         const history = await api(R.loansHistory);
 
         if (!history.length) {
-          tbody.innerHTML = `<tr><td colspan="7" class="empty-state">Brak historii.</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="8" class="empty-state">Brak historii.</td></tr>`;
           return;
         }
 
@@ -1496,6 +1594,7 @@
         <td>${h.item_id}</td>
         <td><button class="btn btn-ghost btn-sm" onclick="showUserDetails(${h.user_id})">#${h.user_id}</button></td>
         <td>${formatDate(h.borrowed_at)}</td>
+        <td>${formatDate(h.due_at)}</td>
         <td>${formatDate(h.returned_at)}</td>
         <td>${h.approved_by_id ? `<button class="btn btn-ghost btn-sm" onclick="showUserDetails(${h.approved_by_id})">#${h.approved_by_id}</button>` : "—"}</td>
 
@@ -1503,7 +1602,7 @@
       </tr>
     `).join("");
       } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="7" class="empty-state" style="color:var(--danger);">${e.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="empty-state" style="color:var(--danger);">${e.message}</td></tr>`;
         toast("Błąd historii: " + e.message, "error");
       }
     }
@@ -1512,7 +1611,7 @@
     ════════════════════════════════════ */
     async function loadAvailability() {
       const tbody = document.getElementById("availTbody");
-      tbody.innerHTML = `<tr><td colspan="7" class="empty-state">Ładowanie…</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" class="empty-state">Ładowanie…</td></tr>`;
       try {
         const role = currentUser?.role || "student";
         const isPriv = role === "nauczyciel" || role === "administrator";
@@ -1529,7 +1628,7 @@
 
         renderAvailability(items, loanMap, isPriv);
       } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="7" class="empty-state" style="color:var(--danger);">${e.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="empty-state" style="color:var(--danger);">${e.message}</td></tr>`;
         toast("Błąd ładowania: " + e.message, "error");
       }
     }
@@ -1567,7 +1666,7 @@
 
     function renderAvailability(items, loanMap, showUser) {
       const tbody = document.getElementById("availTbody");
-      if (!items.length) { tbody.innerHTML = `<tr><td colspan="7" class="empty-state">Brak przedmiotów.</td></tr>`; return; }
+      if (!items.length) { tbody.innerHTML = `<tr><td colspan="8" class="empty-state">Brak przedmiotów.</td></tr>`; return; }
       tbody.innerHTML = items.map(item => {
         const loan = loanMap[item.id];
         const status = loan?.status || "dostepny";
@@ -1579,6 +1678,7 @@
       <td>${escapeHtml(item.kategoria)}</td>
       <td>${escapeHtml(item.lokalizacja)}</td>
       <td>${statusBadge(status)}</td>
+      <td>${formatDate(loan?.due_at)}</td>
       <td>${uid ? (showUser ? `<button class="btn btn-ghost btn-sm" onclick="showUserDetails(${uid})">#${uid}</button>` : "zajęty") : "—"}</td>
       <td class="action-cell">${renderItemActions(item.id, loan)}</td>
     </tr>`;
@@ -1619,7 +1719,7 @@
         div.innerHTML = loans.map(l => `
       <div class="pending-row" style="display:flex;justify-content:space-between;align-items:center;padding:0.55rem 0;border-bottom:1px solid var(--border);">
         <span style="font-family:var(--mono);font-size:0.82rem;">
-          Loan <strong>#${l.id}</strong> · ${l.item_name || "Przedmiot #" + l.item_id} · User #${l.user_id}
+          Loan <strong>#${l.id}</strong> · ${l.item_name || "Przedmiot #" + l.item_id} · User #${l.user_id} · Termin: ${formatDate(l.due_at)}
         </span>
         <button class="btn btn-success btn-sm" onclick="approveLoanById(${l.id})">Zatwierdź</button>
       </div>`).join("");
@@ -1631,15 +1731,17 @@
     ════════════════════════════════════ */
     async function studentRequest() {
       const item_id = parseInt(document.getElementById("studentItemId").value);
+      const due_at = localDateTimeToIso("studentDueAt");
       if (!item_id) return toast("Podaj ID przedmiotu.", "error");
-      await studentRequestById(item_id);
+      await studentRequestById(item_id, due_at);
       document.getElementById("studentItemId").value = "";
+      document.getElementById("studentDueAt").value = "";
     }
 
-    async function studentRequestById(item_id) {
+    async function studentRequestById(item_id, due_at = null) {
       try {
         /* POST /loans/request/  { item_id }  →  LoanRead  (201) */
-        const loan = await api(R.loansRequest, { method: "POST", body: JSON.stringify({ item_id }) });
+        const loan = await api(R.loansRequest, { method: "POST", body: JSON.stringify({ item_id, due_at }) });
         toast(`Wniosek złożony — Loan #${loan.id}. Czekaj na zatwierdzenie.`, "success");
         loadAvailability();
         refreshQrResult();
@@ -1651,15 +1753,17 @@
     ════════════════════════════════════ */
     async function teacherLoan() {
       const item_id = parseInt(document.getElementById("teacherItemId").value);
+      const due_at = localDateTimeToIso("teacherDueAt");
       if (!item_id) return toast("Podaj ID przedmiotu.", "error");
-      await teacherLoanById(item_id);
+      await teacherLoanById(item_id, due_at);
       document.getElementById("teacherItemId").value = "";
+      document.getElementById("teacherDueAt").value = "";
     }
 
-    async function teacherLoanById(item_id) {
+    async function teacherLoanById(item_id, due_at = null) {
       try {
         /* POST /loans/teacher/  { item_id }  →  LoanRead  (201) */
-        const loan = await api(R.loansTeacher, { method: "POST", body: JSON.stringify({ item_id }) });
+        const loan = await api(R.loansTeacher, { method: "POST", body: JSON.stringify({ item_id, due_at }) });
         toast(`Wypożyczono — Loan #${loan.id}.`, "success");
         loadAvailability(); loadPending(); loadHistory();
         refreshQrResult();
@@ -1671,19 +1775,35 @@
     ════════════════════════════════════ */
     async function approveLoan() {
       const loan_id = parseInt(document.getElementById("approveLoanId").value);
+      const due_at = localDateTimeToIso("approveDueAt");
       if (!loan_id) return toast("Podaj Loan ID.", "error");
-      await approveLoanById(loan_id);
+      await approveLoanById(loan_id, due_at);
       document.getElementById("approveLoanId").value = "";
+      document.getElementById("approveDueAt").value = "";
     }
 
-    async function approveLoanById(loan_id) {
+    async function approveLoanById(loan_id, due_at = null) {
       try {
         /* POST /loans/approve/  { loan_id }  →  LoanRead  (200) */
-        await api(R.loansApprove, { method: "POST", body: JSON.stringify({ loan_id }) });
+        await api(R.loansApprove, { method: "POST", body: JSON.stringify({ loan_id, due_at }) });
         toast(`Zatwierdzono Loan #${loan_id}.`, "success");
         loadAvailability(); loadPending(); loadHistory();
         refreshQrResult();
       } catch (e) { toast("Błąd zatwierdzania: " + e.message, "error"); }
+    }
+
+    async function sendDueReminders() {
+      const days = parseInt(document.getElementById("reminderDays").value || "1");
+      try {
+        const data = await api(R.loansDueReminders, {
+          method: "POST",
+          body: JSON.stringify({ days })
+        });
+        toast(`Wysłano przypomnienia: ${data.sent}. Pominięto: ${data.skipped}.`, "success");
+        loadAvailability();
+      } catch (e) {
+        toast("Błąd przypomnień: " + e.message, "error");
+      }
     }
 
     /* ════════════════════════════════════
@@ -1972,12 +2092,193 @@
         <span class="qr-value">${statusBadge(item.status)}</span>
       </div>
       <div class="qr-field">
+        <span class="qr-label">Termin zwrotu</span>
+        <span class="qr-value">${formatDate(item.due_at)}</span>
+      </div>
+      <div class="qr-field">
         <span class="qr-label">Użytkownik</span>
         <span class="qr-value">${userInfo}</span>
       </div>
     </div>
     ${renderItemActions(item.item_id, loan)}
   `;
+    }
+
+    async function loadLocations() {
+      const list = document.getElementById("locationsList");
+      if (!list) return;
+
+      try {
+        const locations = await api(R.locations);
+        list.innerHTML = locations
+          .map(loc => `<option value="${escapeHtml(loc.name)}">${escapeHtml(loc.name)} (${loc.items_count})</option>`)
+          .join("");
+      } catch (e) {
+        toast("Nie udało się pobrać sal: " + e.message, "error");
+      }
+    }
+
+    function addRoomScanFromInput() {
+      const input = document.getElementById("roomQrCode");
+      const qrCode = extractQrCodeFromText(input.value);
+      if (!qrCode) return toast("Podaj kod QR.", "error");
+
+      addRoomScanCode(qrCode);
+      input.value = "";
+    }
+
+    async function scanRoomQrFile(event) {
+      const file = event.target.files?.[0];
+      const status = document.getElementById("roomScanStatus");
+      if (!file) return;
+
+      status.textContent = "Odczytuję QR ze zdjęcia…";
+
+      try {
+        const rawValue = await decodeQrFromFile(file);
+        const qrCode = extractQrCodeFromText(rawValue);
+
+        if (!qrCode) {
+          status.textContent = "Nie znaleziono poprawnego kodu QR.";
+          return toast("Nie znaleziono poprawnego kodu QR.", "error");
+        }
+
+        status.textContent = `Odczytano: ${qrCode}`;
+        addRoomScanCode(qrCode);
+      } catch (e) {
+        status.textContent = e.message || "Nie udało się odczytać QR.";
+        toast("Błąd skanowania sali: " + status.textContent, "error");
+      } finally {
+        event.target.value = "";
+      }
+    }
+
+    function addRoomScanCode(qrCode) {
+      if (roomScanCodes.includes(qrCode)) {
+        return toast("Ten kod QR jest już na liście skanów.", "info");
+      }
+
+      roomScanCodes.push(qrCode);
+      refreshRoomInventory({ latestCode: qrCode });
+    }
+
+    function resetRoomInventory() {
+      roomScanCodes = [];
+      ["roomQrCode", "roomScanStatus", "roomScanSummary"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value !== undefined ? el.value = "" : el.textContent = "";
+      });
+
+      const result = document.getElementById("roomScanResult");
+      if (result) {
+        result.innerHTML = "";
+        result.style.display = "none";
+      }
+    }
+
+    async function refreshRoomInventory(opts = {}) {
+      const location_name = document.getElementById("scanLocationName").value.trim();
+      const result = document.getElementById("roomScanResult");
+      const summary = document.getElementById("roomScanSummary");
+
+      if (!location_name) {
+        return toast("Podaj salę/lokalizację.", "error");
+      }
+
+      result.style.display = "block";
+      result.innerHTML = `<div class="empty-state">Sprawdzam salę…</div>`;
+
+      try {
+        const data = await api(R.inventoryCheck, {
+          method: "POST",
+          body: JSON.stringify({ location_name, qr_codes: roomScanCodes })
+        });
+
+        summary.textContent =
+          `Skanów: ${data.scanned_count}. W sali: ${data.present_count}/${data.expected_count}. ` +
+          `Brakuje: ${data.missing_count}. Zła sala: ${data.wrong_location_count}.`;
+
+        renderRoomInventory(data);
+
+        if (opts.latestCode) {
+          const wrong = data.wrong_location_items.find(item => item.qr_code === opts.latestCode);
+          const unknown = data.unknown_codes.includes(opts.latestCode);
+          if (wrong) toast(wrong.message, "error");
+          else if (unknown) toast("Ten QR nie pasuje do żadnego sprzętu w bazie.", "error");
+          else toast("Skan dodany do inwentaryzacji sali.", "success");
+        }
+      } catch (e) {
+        result.innerHTML = `<div class="empty-state" style="color:var(--danger);">${escapeHtml(e.message)}</div>`;
+        toast("Błąd inwentaryzacji sali: " + e.message, "error");
+      }
+    }
+
+    function renderRoomInventory(data) {
+      const result = document.getElementById("roomScanResult");
+      const wrongList = data.wrong_location_items.map(item => `
+        <div style="padding:0.55rem 0;border-bottom:1px solid var(--border);color:var(--danger);">
+          ${escapeHtml(item.message)}
+        </div>
+      `).join("");
+
+      const missingList = data.missing_items.map(item => `
+        <div style="padding:0.45rem 0;border-bottom:1px solid var(--border);">
+          #${item.item_id} · ${escapeHtml(item.nazwa)} · ${escapeHtml(item.kategoria)}
+        </div>
+      `).join("");
+
+      const presentList = data.present_items.map(item => `
+        <div style="padding:0.45rem 0;border-bottom:1px solid var(--border);">
+          #${item.item_id} · ${escapeHtml(item.nazwa)} · ${statusBadge(item.status)}
+        </div>
+      `).join("");
+
+      const unknownList = data.unknown_codes.map(code => `
+        <div style="padding:0.45rem 0;border-bottom:1px solid var(--border);color:var(--warning);">
+          ${escapeHtml(code)}
+        </div>
+      `).join("");
+
+      result.innerHTML = `
+        <div class="qr-result-grid">
+          <div class="qr-field">
+            <span class="qr-label">Sala</span>
+            <span class="qr-value">${escapeHtml(data.location.name)}</span>
+          </div>
+          <div class="qr-field">
+            <span class="qr-label">W sali</span>
+            <span class="qr-value">${data.present_count}/${data.expected_count}</span>
+          </div>
+          <div class="qr-field">
+            <span class="qr-label">Brakuje</span>
+            <span class="qr-value">${data.missing_count}</span>
+          </div>
+          <div class="qr-field">
+            <span class="qr-label">Zła sala</span>
+            <span class="qr-value">${data.wrong_location_count}</span>
+          </div>
+        </div>
+
+        <div class="qr-field" style="margin-bottom:0.75rem;">
+          <span class="qr-label">Zeskanowane w tej sali</span>
+          ${presentList || `<div class="muted">Brak skanów pasujących do tej sali.</div>`}
+        </div>
+
+        <div class="qr-field" style="margin-bottom:0.75rem;">
+          <span class="qr-label">Brakujące przedmioty</span>
+          ${missingList || `<div class="muted">Nic nie brakuje.</div>`}
+        </div>
+
+        <div class="qr-field" style="margin-bottom:0.75rem;">
+          <span class="qr-label">Przedmioty w złej sali</span>
+          ${wrongList || `<div class="muted">Brak sprzętów z innej sali.</div>`}
+        </div>
+
+        <div class="qr-field">
+          <span class="qr-label">Nieznane kody QR</span>
+          ${unknownList || `<div class="muted">Brak.</div>`}
+        </div>
+      `;
     }
 
     /* ════════════════════════════════════
@@ -2102,8 +2403,7 @@
 
     document.addEventListener("keydown", e => {
       if (e.key !== "Enter" || document.getElementById("loginView").style.display === "none") return;
-      if (document.getElementById("loginCodeBox").style.display !== "none") verifyLoginCode();
-      else login();
+      login();
     });
   </script>
 </body>

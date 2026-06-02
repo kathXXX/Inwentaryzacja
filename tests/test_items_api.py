@@ -72,7 +72,14 @@ def test_create_item():
     assert data["nazwa"] == "Laptop"
     assert data["kategoria"] == "Elektronika"
     assert data["lokalizacja"] == "Sala 101"
+    assert data["location_id"] is not None
     assert "qr_code" in data
+
+    db = TestingSessionLocal()
+    location = db.query(models.Location).filter(models.Location.name == "Sala 101").first()
+    db.close()
+
+    assert location is not None
 
 
 def test_list_items_empty():

@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from slowapi.middleware import SlowAPIMiddleware
 
 from rate_limit import limiter
-from routers import auth, availability, items, loans, users
+from routers import auth, availability, items, loans, locations, users
 from seed import seed_initial_admin
 
 
@@ -55,6 +55,7 @@ app.include_router(users.router)
 app.include_router(items.router)
 app.include_router(availability.router)
 app.include_router(loans.router)
+app.include_router(locations.router)
 
 seed_initial_admin()
 
