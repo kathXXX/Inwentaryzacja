@@ -20,7 +20,7 @@ async def send_email(to_email: str, subject: str, text: str):
         raise RuntimeError("RESEND_API_KEY is not set")
 
     resend.Emails.send({
-        "from": os.getenv("SMTP_FROM", "onboarding@resend.dev"),
+        "from": os.getenv("SMTP_FROM", "noreply@inventory.edu.pl"),
         "to": to_email,
         "subject": subject,
         "text": text,
@@ -38,7 +38,7 @@ Twoj kod resetowania hasla to: {code}
 Kod jest wazny przez 10 minut. Jesli to nie Ty probujesz zresetowac haslo, zignoruj te wiadomosc.
 """
     )
-    
+
 async def send_activation_email(
     to_email: str,
     username: str,
