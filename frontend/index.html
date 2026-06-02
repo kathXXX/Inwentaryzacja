@@ -1234,8 +1234,9 @@
     async function handleActivationLink() {
       const params = new URLSearchParams(window.location.search);
       const activationToken = params.get("token");
+      const isActivation = params.get("activate") === "1"
 
-      if (!activationToken || window.location.pathname !== "/activate") return;
+      if (!activationToken || !isActivation) return;
 
       document.body.innerHTML = `
         <div style="

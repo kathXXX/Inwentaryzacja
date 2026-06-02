@@ -64,7 +64,7 @@ async def create_user(
     db.refresh(new_user)
 
     frontend_url = os.getenv("FRONTEND_URL") or os.getenv("PUBLIC_FRONTEND_URL", "").rstrip("/")
-    activation_link = f"{frontend_url}/activate?token={activation_token}"
+    activation_link = f"{frontend_url}/?activate=1&token={activation_token}"
 
     try:
         await send_activation_email(
