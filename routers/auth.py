@@ -8,8 +8,16 @@ from sqlalchemy.orm import Session
 import models
 from database import get_db
 from rate_limit import limiter
-from routers.email_service import is_email_dev_mode, send_login_code_email
-from schemas import ChangePasswordRequest, LoginCodeRead, LoginCodeRequest, LoginRequest, Token
+from routers.email_service import is_email_dev_mode, send_login_code_email, send_password_reset_code_email
+from schemas import (
+    ChangePasswordRequest,
+    LoginCodeRead,
+    LoginCodeRequest,
+    LoginRequest,
+    PasswordResetConfirm,
+    PasswordResetRequest,
+    Token,
+)
 from security import create_access_token, get_current_user, hash_password, verify_password
 
 
@@ -131,4 +139,100 @@ def change_password(
 
     current_user.password = hash_password(data.new_password)
     db.commit()
+    return {"message": "Haslo zostalo zmienione"}
+
+@router.post("/password-reset/request", response_model=LoginCodeRead)
+@limiter.limit("5/minute")
+async def request_password_reset(
+    request: Request,
+    data: PasswordResetRequest,
+    db: Session = Depends(get_db),
+):
+    user = db.query(models.User).filter(models.User.email == data.email).first()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="Nie znaleziono uzytkownika z takim adresem email")
+
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="Konto nie jest aktywne")
+
+    now = datetime.utcnow()
+
+    db.query(models.LoginCode).filter(
+        models.LoginCode.user_id == user.id,
+        models.LoginCode.used_at == None,
+    ).update({"used_at": now})
+
+    code = generate_login_code()
+
+    challenge = models.LoginCode(
+        challenge_id=secrets.token_urlsafe(32),
+        user_id=user.id,
+        code_hash=hash_password(code),
+        expires_at=now + timedelta(minutes=LOGIN_CODE_TTL_MINUTES),
+    )
+
+    db.add(challenge)
+    db.commit()
+
+    try:
+        await send_password_reset_code_email(user.email, code)
+    except Exception as exc:
+        challenge.used_at = datetime.utcnow()
+        db.commit()
+        raise HTTPException(status_code=500, detail="Nie udalo sie wyslac kodu resetowania hasla") from exc
+
+    return LoginCodeRead(
+        challenge_id=challenge.challenge_id,
+        message="Kod resetowania hasla zostal wyslany na email",
+        email=mask_email(user.email),
+        expires_in_seconds=LOGIN_CODE_TTL_MINUTES * 60,
+        dev_code=code if is_email_dev_mode() else None,
+    )
+
+
+@router.post("/password-reset/confirm")
+@limiter.limit("10/minute")
+def confirm_password_reset(
+    request: Request,
+    data: PasswordResetConfirm,
+    db: Session = Depends(get_db),
+):
+    challenge = (
+        db.query(models.LoginCode)
+        .filter(models.LoginCode.challenge_id == data.challenge_id)
+        .first()
+    )
+
+    if not challenge:
+        raise HTTPException(status_code=400, detail="Nieprawidlowy kod lub sesja resetowania hasla")
+
+    if challenge.used_at is not None:
+        raise HTTPException(status_code=400, detail="Kod zostal juz wykorzystany")
+
+    if challenge.expires_at < datetime.utcnow():
+        challenge.used_at = datetime.utcnow()
+        db.commit()
+        raise HTTPException(status_code=400, detail="Kod wygasl")
+
+    if challenge.attempts >= LOGIN_CODE_MAX_ATTEMPTS:
+        challenge.used_at = datetime.utcnow()
+        db.commit()
+        raise HTTPException(status_code=400, detail="Przekroczono limit prob")
+
+    if not verify_password(data.code, challenge.code_hash):
+        challenge.attempts += 1
+        db.commit()
+        raise HTTPException(status_code=400, detail="Nieprawidlowy kod")
+
+    user = challenge.user
+
+    if not user or not user.is_active:
+        raise HTTPException(status_code=403, detail="Konto nie jest aktywne")
+
+    user.password = hash_password(data.new_password)
+    challenge.used_at = datetime.utcnow()
+
+    db.commit()
+
     return {"message": "Haslo zostalo zmienione"}

@@ -26,7 +26,19 @@ async def send_email(to_email: str, subject: str, text: str):
         "text": text,
     })
 
+async def send_password_reset_code_email(to_email: str, code: str):
+    await send_email(
+        to_email,
+        "Kod resetowania hasla",
+        f"""
+Czesc,
 
+Twoj kod resetowania hasla to: {code}
+
+Kod jest wazny przez 10 minut. Jesli to nie Ty probujesz zresetowac haslo, zignoruj te wiadomosc.
+"""
+    )
+    
 async def send_activation_email(
     to_email: str,
     username: str,

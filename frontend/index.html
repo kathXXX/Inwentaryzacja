@@ -628,22 +628,64 @@
 <body>
 
   <div id="toast-container"></div>
-
   <!-- ══ LOGIN ══ -->
   <div id="loginView">
     <div class="login-logo">inventory<span>.app</span></div>
-    <div class="login-sub">// - - - - - - - </div>
+    <div class="login-sub">- - - - - - - </div>
+
     <div class="card">
       <div class="card-title">Logowanie</div>
+
       <div class="field">
         <label>Użytkownik</label>
         <input type="text" id="loginUser" placeholder="username" autocomplete="username" />
       </div>
+
       <div class="field">
         <label>Hasło</label>
         <input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password" />
       </div>
+
       <button class="btn btn-primary btn-full" id="loginBtn" onclick="login()">Zaloguj</button>
+
+      <button class="btn btn-ghost btn-full" type="button" onclick="showPasswordReset()">
+        Nie pamiętasz hasła?
+      </button>
+
+      <div id="passwordResetBox" style="display:none;margin-top:1rem;">
+        <hr class="div" />
+
+        <div class="field">
+          <label>Email</label>
+          <input type="email" id="resetEmail" placeholder="email@example.com" />
+        </div>
+
+        <button class="btn btn-primary btn-full" type="button" onclick="requestPasswordReset()">
+          Wyślij kod
+        </button>
+
+        <div id="passwordResetConfirmBox" style="display:none;margin-top:1rem;">
+          <div class="field">
+            <label>Kod z emaila</label>
+            <input type="text" id="resetCode" placeholder="000000" inputmode="numeric" autocomplete="one-time-code" />
+          </div>
+
+          <div class="field">
+            <label>Nowe hasło</label>
+            <input type="password" id="resetNewPassword" placeholder="Nowe hasło" autocomplete="new-password" />
+          </div>
+
+          <div class="field">
+            <label>Powtórz nowe hasło</label>
+            <input type="password" id="resetNewPassword2" placeholder="Powtórz nowe hasło" autocomplete="new-password" />
+          </div>
+
+          <button class="btn btn-success btn-full" type="button" onclick="confirmPasswordReset()">
+            Zmień hasło
+          </button>
+        </div>
+      </div>
+
       <div id="loginCodeBox" style="display:none;margin-top:1rem;">
         <hr class="div" />
         <div class="field">
@@ -654,7 +696,6 @@
       </div>
     </div>
   </div>
-
   <!-- ══ APP ══ -->
   <div id="appView">
     <div class="topbar">
@@ -984,6 +1025,8 @@
       login: `${BASE}/login`,
       loginVerify: `${BASE}/login/verify`,
       changePassword: `${BASE}/change-password`,
+      passwordResetRequest: `${BASE}/password-reset/request`,
+      passwordResetConfirm: `${BASE}/password-reset/confirm`,
       items: `${BASE}/items/`,
       itemsBulkPdf: `${BASE}/items/bulk/pdf`,
       item: id => `${BASE}/items/${id}`,
@@ -1010,6 +1053,7 @@
     let currentQrCode = new URLSearchParams(window.location.search).get("qr") || null;
     let pendingLoginChallenge = null;
     let pendingLoginUsername = null;
+    let pendingPasswordResetChallenge = null;
 
     /* ════════════════════════════════════
        UTILS
@@ -1222,6 +1266,82 @@
       }
     }
 
+    function showPasswordReset() {
+      const box = document.getElementById("passwordResetBox");
+      box.style.display = box.style.display === "none" ? "block" : "none";
+    }
+
+    async function requestPasswordReset() {
+      const email = document.getElementById("resetEmail").value.trim();
+
+      if (!email) {
+        return toast("Podaj email.", "error");
+      }
+
+      try {
+        const data = await api(R.passwordResetRequest, {
+          method: "POST",
+          body: JSON.stringify({ email })
+        });
+
+        pendingPasswordResetChallenge = data.challenge_id;
+
+        document.getElementById("passwordResetConfirmBox").style.display = "block";
+        document.getElementById("resetCode").focus();
+
+        const devMsg = data.dev_code ? ` Kod testowy: ${data.dev_code}` : "";
+        toast(`${data.message || "Kod został wysłany"}.${devMsg}`, "success");
+      } catch (e) {
+        toast("Nie udało się wysłać kodu: " + e.message, "error");
+      }
+    }
+
+    async function confirmPasswordReset() {
+      const code = document.getElementById("resetCode").value.trim();
+      const new_password = document.getElementById("resetNewPassword").value;
+      const new_password2 = document.getElementById("resetNewPassword2").value;
+
+      if (!pendingPasswordResetChallenge) {
+        return toast("Najpierw wyślij kod na email.", "error");
+      }
+
+      if (!code || !new_password || !new_password2) {
+        return toast("Uzupełnij kod i nowe hasło.", "error");
+      }
+
+      if (new_password.length < 8) {
+        return toast("Nowe hasło musi mieć min. 8 znaków.", "error");
+      }
+
+      if (new_password !== new_password2) {
+        return toast("Hasła nie są takie same.", "error");
+      }
+
+      try {
+        await api(R.passwordResetConfirm, {
+          method: "POST",
+          body: JSON.stringify({
+            challenge_id: pendingPasswordResetChallenge,
+            code,
+            new_password
+          })
+        });
+
+        pendingPasswordResetChallenge = null;
+
+        document.getElementById("resetEmail").value = "";
+        document.getElementById("resetCode").value = "";
+        document.getElementById("resetNewPassword").value = "";
+        document.getElementById("resetNewPassword2").value = "";
+
+        document.getElementById("passwordResetBox").style.display = "none";
+        document.getElementById("passwordResetConfirmBox").style.display = "none";
+
+        toast("Hasło zostało zmienione. Możesz się zalogować.", "success");
+      } catch (e) {
+        toast("Nie udało się zmienić hasła: " + e.message, "error");
+      }
+    }
     /* ════════════════════════════════════
        SHOW APP + ROLE GATES
     ════════════════════════════════════ */
