@@ -859,7 +859,7 @@
             oninput="filterRows('searchAvailability', '#availTbody tr')"
           />
         </div>
-        <div class="table-wrap">
+        <div class="history-table-wrapper">
           <table>
             <thead>
               <tr>
@@ -1081,7 +1081,7 @@
         />
       </div>
 
-      <div class="table-wrap">
+      <div class="history-table-wrapper">
         <table>
           <thead>
             <tr>
@@ -1950,7 +1950,17 @@
         <span style="font-family:var(--mono);font-size:0.82rem;">
           Loan <strong>#${l.id}</strong> · ${l.item_name || "Przedmiot #" + l.item_id} · User #${l.user_id} · Termin: ${formatDate(l.due_at)}
         </span>
-        <button class="btn btn-success btn-sm" onclick="approveLoanById(${l.id})">Zatwierdź</button>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-success btn-sm"
+                  onclick="approveLoanById(${l.id})">
+            Zatwierdź
+          </button>
+
+          <button class="btn btn-danger btn-sm"
+                  onclick="rejectLoan(${l.id})">
+            Odrzuć
+          </button>
+        </div>
       </div>`).join("");
       } catch (e) { toast("Błąd wniosków: " + e.message, "error"); }
     }
@@ -2048,6 +2058,26 @@
         loadAvailability(); loadPending(); loadHistory();
         refreshQrResult();
       } catch (e) { toast("Błąd zatwierdzania: " + e.message, "error"); }
+    }
+
+    async function rejectLoan(loan_id) {
+
+      if (!confirm(`Odrzucić wniosek #${loan_id}?`)) return;
+
+      try {
+        await api(`/api/loans/reject/`, {
+          method: "POST",
+          body: JSON.stringify({ loan_id })
+        });
+
+        toast(`Odrzucono wniosek #${loan_id}.`, "success");
+
+        loadPending();
+        loadAvailability();
+
+      } catch (e) {
+        toast("Błąd odrzucania: " + e.message, "error");
+      }
     }
 
     async function sendDueReminders() {

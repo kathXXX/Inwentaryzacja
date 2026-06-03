@@ -303,3 +303,24 @@ async def send_due_reminders(
     db.commit()
 
     return DueReminderRead(sent=sent, skipped=skipped)
+
+@router.post("/reject/")
+
+async def reject_loan(
+    req: LoanApproveRequest,
+    db: db_dependency,
+    current_user: models.User = Depends(require_teacher),
+):
+    loan = (
+        db.query(models.Loan)
+        .filter(models.Loan.id == req.loan_id)
+        .first()
+    )
+
+    if not loan:
+        raise HTTPException(404, "Wniosek nie istnieje")
+
+    db.delete(loan)
+    db.commit()
+
+    return {"message": "Wniosek odrzucony"}
