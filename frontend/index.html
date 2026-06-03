@@ -722,7 +722,7 @@
         <button class="tab-btn" onclick="switchTab('loanTab', this)">
           Wypożyczenia
         </button>
-        <button class="tab-btn" onclick="switchTab('adminTab', this)">
+        <button id="adminTabBtn" class="tab-btn" onclick="switchTab('adminTab', this)">
           Administracja
         </button>
         <button class="tab-btn" onclick="switchTab('qrTab', this)">
@@ -777,7 +777,7 @@
                 <th>Lokalizacja</th>
                 <th>Status</th>
                 <th>Termin</th>
-                <th>Użytkownik</th>
+                <th class="teacher-only">Użytkownik</th>
                 <th>Akcja</th>
               </tr>
             </thead>
@@ -1144,6 +1144,7 @@
     let pendingPasswordResetChallenge = null;
     let roomScanCodes = [];
     let pendingTeacherLoanItemId = null;
+    let pendingStudentRequestItemId = null;
 
     function openLoanDueModal(itemId) {
       pendingTeacherLoanItemId = itemId;
@@ -1159,9 +1160,47 @@
         if (input.showPicker) input.showPicker();
       }, 100);
     }
+    function openStudentDueModal(itemId) {
+      pendingStudentRequestItemId = itemId;
 
+      const input = document.getElementById("loanDueModalInput");
+      const defaultDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+      input.value = defaultDate.toISOString().slice(0, 16);
+      document.getElementById("loanDueModal").style.display = "flex";
+
+      setTimeout(() => {
+        input.focus();
+        if (input.showPicker) input.showPicker();
+      }, 100);
+    }
+
+    async function confirmLoanDueModal() {
+      const value = document.getElementById("loanDueModalInput").value;
+
+      if (!value) return toast("Podaj termin zwrotu.", "error");
+
+      const due_at = new Date(value).toISOString();
+
+      if (pendingTeacherLoanItemId) {
+        const itemId = pendingTeacherLoanItemId;
+        closeLoanDueModal();
+        await teacherLoanById(itemId, due_at);
+        return;
+      }
+
+      if (pendingStudentRequestItemId) {
+        const itemId = pendingStudentRequestItemId;
+        closeLoanDueModal();
+        await studentRequestById(itemId, due_at);
+        return;
+      }
+
+      closeLoanDueModal();
+    }
     function closeLoanDueModal() {
       pendingTeacherLoanItemId = null;
+      pendingStudentRequestItemId = null;
       document.getElementById("loanDueModal").style.display = "none";
       document.getElementById("loanDueModalInput").value = "";
     }
@@ -1617,8 +1656,15 @@
 
       const { role, isAdmin, isTeach, isStud } = roleFlags();
 
+      document.getElementById("adminTabBtn").style.display =
+        isAdmin ? "inline-flex" : "none";
+
       document.getElementById("topbarUser").innerHTML =
         `${currentUser?.username || "?"}&nbsp;<span class="role-pill role-${role}">${role}</span>`;
+      
+      document.querySelectorAll(".teacher-only").forEach(el => {
+        el.style.display = isTeach ? "" : "none";
+      });
 
       show("sectionPending", isTeach);
       show("sectionHistory", isTeach);
@@ -1716,7 +1762,7 @@
       const loanId = loan?.id || loan?.loan_id || null;
 
       if (isStud && status === "dostepny") {
-        return `<div class="action-stack"><button class="btn btn-primary btn-sm" onclick="studentRequestById(${itemId})">Wniosek</button></div>`;
+        return `<div class="action-stack"><button class="btn btn-primary btn-sm" onclick="openStudentDueModal(${itemId})">Wniosek</button></div>`;
       }
 
       if (isTeach && status === "dostepny") {
@@ -1749,7 +1795,7 @@
       <td>${escapeHtml(item.lokalizacja)}</td>
       <td>${statusBadge(status)}</td>
       <td>${formatDate(loan?.due_at)}</td>
-      <td>${uid ? (showUser ? `<button class="btn btn-ghost btn-sm" onclick="showUserDetails(${uid})">#${uid}</button>` : "zajęty") : "—"}</td>
+      ${showUser ? `<td>${uid ? `<button class="btn btn-ghost btn-sm" onclick="showUserDetails(${uid})">#${uid}</button>` : "—"}</td>` : ""}
       <td class="action-cell">${renderItemActions(item.id, loan)}</td>
     </tr>`;
       }).join("");
