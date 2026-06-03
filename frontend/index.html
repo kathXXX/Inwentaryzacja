@@ -965,16 +965,23 @@
 
       <hr class="div" />
 
-      <label style="margin-bottom:0.4rem;">Powiadom studentów o zbliżającym się terminie zwrotu</label>
+      <label style="margin-bottom:0.4rem;">
+        Powiadom studentów o zbliżającym się terminie zwrotu
+      </label>
+
+      <p style="font-family:var(--mono);font-size:0.75rem;color:var(--muted);margin-bottom:0.6rem;">
+        Wpisz liczbę dni do terminu zwrotu, np. 1, 7 albo 30.
+      </p>
+
       <div class="row" style="margin-bottom:0.5rem;">
         <input
           id="reminderDays"
           type="number"
           min="1"
+          max="365"
           value="1"
-          placeholder="Ile dni przed terminem zwrotu wysłać przypomnienie"
+          placeholder="Liczba dni"
         />
-        <input type="number" id="reminderDays" min="0" max="30" value="1" />
         <button class="btn btn-ghost" onclick="sendDueReminders()">Wyślij przypomnienia</button>
       </div>
 
