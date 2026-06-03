@@ -808,7 +808,12 @@
         </p>
         <div class="row">
           <input type="number" id="studentItemId" placeholder="ID przedmiotu" min="1" />
-          <input type="datetime-local" id="studentDueAt" title="Termin zwrotu" />
+          <input
+            type="datetime-local"
+            id="studentDueAt"
+            title="Termin zwrotu"
+            onclick="this.showPicker && this.showPicker()"
+          />
           <button class="btn btn-primary" onclick="studentRequest()">Złóż wniosek</button>
         </div>
       </div>
@@ -2568,6 +2573,13 @@
         dateFormat: "Y-m-d H:i",
         time_24hr: true
     });
+
+    flatpickr("#studentDueAt", {
+      enableTime: true,
+      dateFormat: "Y-m-d H:i",
+      time_24hr: true
+    });
+
   </script>
 </body>
 
