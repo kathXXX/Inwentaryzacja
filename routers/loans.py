@@ -197,7 +197,7 @@ async def return_loan(
             models.LoanHistory.user_id == loan.user_id,
             models.LoanHistory.returned_at == None,
         )
-        .order_by(models.LoanHistory.borrowed_at.desc())
+        .borrowed_at.desc.order_by(models.LoanHistory())
         .first()
     )
 
