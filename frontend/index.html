@@ -51,7 +51,17 @@
       margin-bottom: 20px;
       flex-wrap: wrap;
     }
+    /* Ukrywa strzałki w input type=number */
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
 
+    input[type="number"] {
+      appearance: textfield;
+      -moz-appearance: textfield;
+    }
     .tab-btn {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -957,6 +967,13 @@
 
       <label style="margin-bottom:0.4rem;">Powiadom studentów o zbliżającym się terminie zwrotu</label>
       <div class="row" style="margin-bottom:0.5rem;">
+        <input
+          id="reminderDays"
+          type="number"
+          min="1"
+          value="1"
+          placeholder="Ile dni przed terminem zwrotu wysłać przypomnienie"
+        />
         <input type="number" id="reminderDays" min="0" max="30" value="1" />
         <button class="btn btn-ghost" onclick="sendDueReminders()">Wyślij przypomnienia</button>
       </div>
