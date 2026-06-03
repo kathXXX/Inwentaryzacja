@@ -953,7 +953,7 @@
 
       <label style="margin-bottom:0.4rem;">Zatwierdź wniosek studenta</label>
       <div class="row" style="margin-bottom:0.5rem;">
-        <input type="number" id="approveLoanId" placeholder="Loan ID" min="1" />
+        <input type="number" id="approveLoanId" placeholder="Loan ID" min="1" autocomplete="off" />
         <input
           type="datetime-local"
           id="approveDueAt"
@@ -981,6 +981,7 @@
           max="365"
           value="1"
           placeholder="Liczba dni"
+          autocomplete="off"
         />
         <button class="btn btn-ghost" onclick="sendDueReminders()">Wyślij przypomnienia</button>
       </div>
@@ -989,7 +990,7 @@
 
       <label style="margin-bottom:0.4rem;">Oznacz jako zwrócony</label>
       <div class="row">
-        <input type="number" id="returnLoanId" placeholder="Loan ID" min="1" />
+        <input type="number" id="returnLoanId" placeholder="Loan ID" min="1" autocomplete="off" />
         <button class="btn btn-ghost" onclick="returnLoan()">Zwróć</button>
       </div>
     </div>
@@ -1318,18 +1319,7 @@
       document.getElementById("loanDueModalInput").value = "";
     }
 
-    async function confirmLoanDueModal() {
-      const value = document.getElementById("loanDueModalInput").value;
 
-      if (!pendingTeacherLoanItemId) return closeLoanDueModal();
-      if (!value) return toast("Podaj termin zwrotu.", "error");
-
-      const itemId = pendingTeacherLoanItemId;
-      const due_at = new Date(value).toISOString();
-
-      closeLoanDueModal();
-      await teacherLoanById(itemId, due_at);
-    }
     /* ════════════════════════════════════
        UTILS
     ════════════════════════════════════ */
@@ -2000,11 +1990,6 @@
       document.getElementById("teacherDueAt").value = "";
     }
 
-    function closeLoanDueModal() {
-      pendingTeacherLoanItemId = null;
-      document.getElementById("loanDueModal").style.display = "none";
-      document.getElementById("loanDueModalInput").value = "";
-    }
 
     async function confirmLoanDueModal() {
         const value = document.getElementById("loanDueModalInput").value;
