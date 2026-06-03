@@ -201,15 +201,22 @@ async def return_loan(
         .first()
     )
 
+    now = datetime.utcnow()
+
     if not history:
-        raise HTTPException(
-            status_code=404,
-            detail="Nie znaleziono aktywnego wpisu w historii wypożyczenia"
+        history = models.LoanHistory(
+            item_id=loan.item_id,
+            user_id=loan.user_id,
+            borrowed_at=loan.borrowed_at if hasattr(loan, "borrowed_at") else now,
+            due_at=loan.due_at,
+            returned_at=now,
+            returned_by_id=current_user.id,
         )
-
-    history.returned_at = datetime.utcnow()
-    history.returned_by_id = current_user.id
-
+        db.add(history)
+    else:
+        history.returned_at = now
+        history.returned_by_id = current_user.id
+        
     loan.status = ItemStatus.dostepny
     loan.user_id = None
     loan.due_at = None
