@@ -839,7 +839,12 @@
       <label style="margin-bottom:0.4rem;">Wypożycz przedmiot dla siebie (bezpośrednio)</label>
       <div class="row" style="margin-bottom:0.5rem;">
         <input type="number" id="teacherItemId" placeholder="ID przedmiotu" min="1" />
-        <input type="datetime-local" id="teacherDueAt" title="Termin zwrotu" />
+        <input
+          type="datetime-local"
+          id="teacherDueAt"
+          title="Termin zwrotu"
+          onclick="this.showPicker && this.showPicker()"
+        />
         <button class="btn btn-warning" onclick="teacherLoan()">Wypożycz dla siebie</button>
       </div>
 
@@ -848,7 +853,12 @@
       <label style="margin-bottom:0.4rem;">Zatwierdź wniosek studenta</label>
       <div class="row" style="margin-bottom:0.5rem;">
         <input type="number" id="approveLoanId" placeholder="Loan ID" min="1" />
-        <input type="datetime-local" id="approveDueAt" title="Nadpisz termin zwrotu" />
+        <input
+          type="datetime-local"
+          id="approveDueAt"
+          title="Nadpisz termin zwrotu"
+          onclick="this.showPicker && this.showPicker()"
+        />
         <button class="btn btn-success" onclick="approveLoan()">Zatwierdź</button>
       </div>
 
@@ -1077,7 +1087,11 @@
 
       <div class="field">
         <label>Termin zwrotu</label>
-        <input type="datetime-local" id="loanDueModalInput" />
+        <input
+          type="datetime-local"
+          id="loanDueModalInput"
+          onclick="this.showPicker && this.showPicker()"
+        />
       </div>
 
       <div class="row" style="justify-content:flex-end;">
@@ -1129,6 +1143,39 @@
     let roomScanCodes = [];
     let pendingTeacherLoanItemId = null;
 
+    function openLoanDueModal(itemId) {
+      pendingTeacherLoanItemId = itemId;
+
+      const input = document.getElementById("loanDueModalInput");
+      const defaultDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+      input.value = defaultDate.toISOString().slice(0, 16);
+      document.getElementById("loanDueModal").style.display = "flex";
+
+      setTimeout(() => {
+        input.focus();
+        if (input.showPicker) input.showPicker();
+      }, 100);
+    }
+
+    function closeLoanDueModal() {
+      pendingTeacherLoanItemId = null;
+      document.getElementById("loanDueModal").style.display = "none";
+      document.getElementById("loanDueModalInput").value = "";
+    }
+
+    async function confirmLoanDueModal() {
+      const value = document.getElementById("loanDueModalInput").value;
+
+      if (!pendingTeacherLoanItemId) return closeLoanDueModal();
+      if (!value) return toast("Podaj termin zwrotu.", "error");
+
+      const itemId = pendingTeacherLoanItemId;
+      const due_at = new Date(value).toISOString();
+
+      closeLoanDueModal();
+      await teacherLoanById(itemId, due_at);
+    }
     /* ════════════════════════════════════
        UTILS
     ════════════════════════════════════ */
@@ -1779,16 +1826,6 @@
       await teacherLoanById(item_id, due_at);
       document.getElementById("teacherItemId").value = "";
       document.getElementById("teacherDueAt").value = "";
-    }
-    function openLoanDueModal(itemId) {
-      pendingTeacherLoanItemId = itemId;
-
-      const input = document.getElementById("loanDueModalInput");
-      const defaultDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-
-      input.value = defaultDate.toISOString().slice(0, 16);
-      document.getElementById("loanDueModal").style.display = "flex";
-      input.focus();
     }
 
     function closeLoanDueModal() {
