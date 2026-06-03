@@ -1713,6 +1713,7 @@
 
         tbody.innerHTML = history.map(h => `
       <tr>
+        <td>${h.id}</td>
         <td>#${h.item_id}<br>${escapeHtml(h.item_name || "")}</td>
         <td><button class="btn btn-ghost btn-sm" onclick="showUserDetails(${h.user_id})">#${h.user_id}</button></td>
         <td>${formatDate(h.borrowed_at)}</td>
