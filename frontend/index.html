@@ -113,6 +113,19 @@
       color: var(--primary);
     }
 
+    .history-table-wrapper {
+        max-height: 550px;
+        overflow-y: auto;
+        overflow-x: auto;
+    }
+
+    .history-table-wrapper thead th {
+        position: sticky;
+        top: 0;
+        background: #141c2f;
+        z-index: 10;
+    }
+
     @keyframes slideIn {
       from {
         transform: translateX(20px);
@@ -903,7 +916,7 @@
         />
       </div>
 
-      <div class="table-wrap">
+      <div class="history-table-wrapper">
         <table>
           <thead>
             <tr>
