@@ -8,6 +8,8 @@
   <link
     href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
     rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <style>
     :root {
       --bg: #0f1117;
@@ -424,7 +426,7 @@
       color: var(--muted);
       font-weight: 600;
     }
-
+    
     .ml-auto {
       margin-left: auto;
     }
@@ -2500,6 +2502,25 @@
     document.addEventListener("keydown", e => {
       if (e.key !== "Enter" || document.getElementById("loginView").style.display === "none") return;
       login();
+    });
+
+    // Kalendarz
+    flatpickr("#teacherDueAt", {
+        enableTime: true,
+        dateFormat: "Y-m-d H:i",
+        time_24hr: true
+    });
+
+    flatpickr("#approveDueAt", {
+        enableTime: true,
+        dateFormat: "Y-m-d H:i",
+        time_24hr: true
+    });
+
+    flatpickr("#loanDueModalInput", {
+        enableTime: true,
+        dateFormat: "Y-m-d H:i",
+        time_24hr: true
     });
   </script>
 </body>
