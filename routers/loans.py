@@ -307,7 +307,7 @@ async def send_due_reminders(
 @router.post("/reject/")
 
 async def reject_loan(
-    req: LoanApproveRequest,
+    req: LoanApprove,
     db: db_dependency,
     current_user: models.User = Depends(require_teacher),
 ):
