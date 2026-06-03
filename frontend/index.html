@@ -1064,8 +1064,28 @@
 
 
     <footer>© 2026 inventory.app ·</footer>
-  </div>
+    </div>
+    <div id="loanDueModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:9998;align-items:center;justify-content:center;padding:1rem;">
+    <div class="section" style="width:100%;max-width:420px;margin:0;">
+      <div class="section-header">
+        <h4>Podaj termin wypożyczenia</h4>
+      </div>
 
+      <p style="font-family:var(--mono);font-size:0.78rem;color:var(--muted);margin-bottom:0.9rem;">
+        Podaj do kiedy chcesz wypożyczyć przedmiot.
+      </p>
+
+      <div class="field">
+        <label>Termin zwrotu</label>
+        <input type="datetime-local" id="loanDueModalInput" />
+      </div>
+
+      <div class="row" style="justify-content:flex-end;">
+        <button class="btn btn-ghost" type="button" onclick="closeLoanDueModal()">Anuluj</button>
+        <button class="btn btn-warning" type="button" onclick="confirmLoanDueModal()">Wypożycz</button>
+      </div>
+    </div>
+  </div>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
   <script>
     /* ════════════════════════════════════
@@ -1107,6 +1127,7 @@
     let currentQrCode = new URLSearchParams(window.location.search).get("qr") || null;
     let pendingPasswordResetChallenge = null;
     let roomScanCodes = [];
+    let pendingTeacherLoanItemId = null;
 
     /* ════════════════════════════════════
        UTILS
@@ -1650,7 +1671,7 @@
       }
 
       if (isTeach && status === "dostepny") {
-        return `<div class="action-stack"><button class="btn btn-warning btn-sm" onclick="teacherLoanById(${itemId})">Wypożycz</button></div>`;
+        return `<div class="action-stack"><button class="btn btn-warning btn-sm" onclick="openLoanDueModal(${itemId})">Wypożycz</button></div>`;
       }
 
       if (isTeach && status === "zarezerwowany" && loanId) {
@@ -1759,17 +1780,55 @@
       document.getElementById("teacherItemId").value = "";
       document.getElementById("teacherDueAt").value = "";
     }
+    function openLoanDueModal(itemId) {
+      pendingTeacherLoanItemId = itemId;
 
-    async function teacherLoanById(item_id, due_at = null) {
-      try {
-        /* POST /loans/teacher/  { item_id }  →  LoanRead  (201) */
-        const loan = await api(R.loansTeacher, { method: "POST", body: JSON.stringify({ item_id, due_at }) });
-        toast(`Wypożyczono — Loan #${loan.id}.`, "success");
-        loadAvailability(); loadPending(); loadHistory();
-        refreshQrResult();
-      } catch (e) { toast("Błąd: " + e.message, "error"); }
+      const input = document.getElementById("loanDueModalInput");
+      const defaultDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+      input.value = defaultDate.toISOString().slice(0, 16);
+      document.getElementById("loanDueModal").style.display = "flex";
+      input.focus();
     }
 
+    function closeLoanDueModal() {
+      pendingTeacherLoanItemId = null;
+      document.getElementById("loanDueModal").style.display = "none";
+      document.getElementById("loanDueModalInput").value = "";
+    }
+
+    async function confirmLoanDueModal() {
+        const value = document.getElementById("loanDueModalInput").value;
+
+        if (!pendingTeacherLoanItemId) return closeLoanDueModal();
+        if (!value) return toast("Podaj termin zwrotu.", "error");
+
+        const itemId = pendingTeacherLoanItemId;
+        const due_at = new Date(value).toISOString();
+
+        closeLoanDueModal();
+        await teacherLoanById(itemId, due_at);
+      }
+
+    async function teacherLoanById(item_id, due_at = null) {
+      if (!due_at) return openLoanDueModal(item_id);
+
+      try {
+        const loan = await api(R.loansTeacher, {
+          method: "POST",
+          body: JSON.stringify({ item_id, due_at })
+        });
+
+        toast(`Wypożyczono — Loan #${loan.id}.`, "success");
+        loadAvailability();
+        loadPending();
+        loadHistory();
+        refreshQrResult();
+
+      } catch (e) {
+        toast("Błąd: " + e.message, "error");
+      }
+    }
     /* ════════════════════════════════════
        TEACHER — approve
     ════════════════════════════════════ */
