@@ -808,10 +808,12 @@
         </p>
         <div class="row">
           <input type="number" id="studentItemId" placeholder="ID przedmiotu" min="1" />
+          <label>Data zwrotu</label>
           <input
             type="datetime-local"
             id="studentDueAt"
-            title="Termin zwrotu"
+            title="Data zwrotu"
+            aria-label="Data zwrotu"
             onclick="this.showPicker && this.showPicker()"
           />
           <button class="btn btn-primary" onclick="studentRequest()">Złóż wniosek</button>
@@ -1854,6 +1856,7 @@
       const item_id = parseInt(document.getElementById("studentItemId").value);
       const due_at = localDateTimeToIso("studentDueAt");
       if (!item_id) return toast("Podaj ID przedmiotu.", "error");
+      if (!due_at) return toast("Podaj datę zwrotu.", "error");
       await studentRequestById(item_id, due_at);
       document.getElementById("studentItemId").value = "";
       document.getElementById("studentDueAt").value = "";
