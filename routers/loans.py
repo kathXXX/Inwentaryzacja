@@ -201,14 +201,20 @@ async def return_loan(
         .first()
     )
 
-    if history:
-        history.returned_at = datetime.utcnow()
-        history.returned_by_id = current_user.id
-        loan.status = ItemStatus.dostepny
-        loan.user_id = None
-        loan.due_at = None
-        loan.due_reminder_sent_at = None
+    if not history:
+        raise HTTPException(
+            status_code=404,
+            detail="Nie znaleziono aktywnego wpisu w historii wypożyczenia"
+        )
 
+    history.returned_at = datetime.utcnow()
+    history.returned_by_id = current_user.id
+
+    loan.status = ItemStatus.dostepny
+    loan.user_id = None
+    loan.due_at = None
+    loan.due_reminder_sent_at = None
+    
     db.commit()
     db.refresh(loan)
     return loan
