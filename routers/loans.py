@@ -236,7 +236,23 @@ async def loan_history(
     db: db_dependency,
     current_user: models.User = Depends(require_teacher),
 ):
-    return db.query(models.LoanHistory).all()
+
+    histories = db.query(models.LoanHistory).order_by(models.LoanHistory.borrowed_at.desc()).all()
+
+    return [
+        LoanHistoryRead(
+            id=h.id,
+            item_id=h.item_id,
+            item_name=h.item.nazwa if h.item else None,
+            user_id=h.user_id,
+            borrowed_at=h.borrowed_at,
+            due_at=h.due_at,
+            returned_at=h.returned_at,
+            approved_by_id=h.approved_by_id,
+            returned_by_id=h.returned_by_id,
+        )
+        for h in histories
+    ]
 
 
 @router.post(

@@ -158,6 +158,7 @@ class LoanHistoryRead(BaseModel):
     item_id: int
     user_id: int
     borrowed_at: datetime
+    item_name: str | None = None
     due_at: Optional[datetime]
     returned_at: Optional[datetime]
     approved_by_id: Optional[int]
