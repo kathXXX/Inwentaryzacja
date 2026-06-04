@@ -305,7 +305,6 @@ async def send_due_reminders(
     return DueReminderRead(sent=sent, skipped=skipped)
 
 @router.post("/reject/")
-
 async def reject_loan(
     req: LoanApprove,
     db: db_dependency,
@@ -320,7 +319,20 @@ async def reject_loan(
     if not loan:
         raise HTTPException(404, "Wniosek nie istnieje")
 
-    db.delete(loan)
-    db.commit()
+    if loan.status != ItemStatus.zarezerwowany:
+        raise HTTPException(
+            status_code=400,
+            detail="Mozna odrzucic tylko wniosek oczekujacy"
+        )
 
-    return {"message": "Wniosek odrzucony"}
+    loan.status = ItemStatus.dostepny
+    loan.user_id = None
+    loan.due_at = None
+    loan.due_reminder_sent_at = None
+
+    db.commit()
+    db.refresh(loan)
+
+    return {
+        "message": "Wniosek odrzucony"
+    }
