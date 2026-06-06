@@ -1866,7 +1866,7 @@
       const loanId = loan?.id || loan?.loan_id || null;
 
       if (isStud && status === "dostepny") {
-        return `<div class="action-stack"><button class="btn btn-primary btn-sm" onclick="openStudentDueModal(${itemId})">Wniosek</button></div>`;
+        return `<div class="action-stack"><button class="btn btn-primary btn-sm" onclick="studentRequest(${itemId})">Wniosek</button></div>`;
       }
 
       if (isTeach && status === "dostepny") {
