@@ -1991,7 +1991,7 @@
       document.getElementById("teacherDueAt").value = "";
     }
 
-
+/*
     async function confirmLoanDueModal() {
         const value = document.getElementById("loanDueModalInput").value;
 
@@ -2004,7 +2004,7 @@
         closeLoanDueModal();
         await teacherLoanById(itemId, due_at);
       }
-
+*/
     async function teacherLoanById(item_id, due_at = null) {
       if (!due_at) return openLoanDueModal(item_id);
 
