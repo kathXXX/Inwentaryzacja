@@ -1867,7 +1867,7 @@
       const loanId = loan?.id || loan?.loan_id || null;
 
       if (isStud && status === "dostepny") {
-        return `<div class="action-stack"><button class="btn btn-primary btn-sm" onclick="studentRequest(${itemId})">Wniosek</button></div>`;
+        return `<div class="action-stack"><button class="btn btn-primary btn-sm" onclick="openStudentDueModal(${itemId})">Wniosek</button></div>`;
       }
 
       if (isTeach && status === "dostepny") {
@@ -1992,7 +1992,7 @@
       document.getElementById("teacherDueAt").value = "";
     }
 
-
+/*
     async function confirmLoanDueModal() {
         const value = document.getElementById("loanDueModalInput").value;
 
@@ -2005,7 +2005,7 @@
         closeLoanDueModal();
         await teacherLoanById(itemId, due_at);
       }
-
+*/
     async function teacherLoanById(item_id, due_at = null) {
       if (!due_at) return openLoanDueModal(item_id);
 
