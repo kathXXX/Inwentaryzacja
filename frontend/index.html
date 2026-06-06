@@ -1289,7 +1289,7 @@
         if (input.showPicker) input.showPicker();
       }, 100);
     }
-
+/*
     async function confirmLoanDueModal() {
       const value = document.getElementById("loanDueModalInput").value;
 
@@ -1313,6 +1313,7 @@
 
       closeLoanDueModal();
     }
+    */
     function closeLoanDueModal() {
       pendingTeacherLoanItemId = null;
       pendingStudentRequestItemId = null;
@@ -1991,7 +1992,7 @@
       document.getElementById("teacherDueAt").value = "";
     }
 
-/*
+
     async function confirmLoanDueModal() {
         const value = document.getElementById("loanDueModalInput").value;
 
@@ -2004,7 +2005,7 @@
         closeLoanDueModal();
         await teacherLoanById(itemId, due_at);
       }
-*/
+
     async function teacherLoanById(item_id, due_at = null) {
       if (!due_at) return openLoanDueModal(item_id);
 
