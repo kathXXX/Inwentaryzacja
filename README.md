@@ -1,5 +1,6 @@
 # Inwentaryzacja
-STRONA: https://web-production-53ca6.up.railway.app/
+STRONA: https://www.inventory.edu.pl/
+
 dane dla studenta: login: marek hasło: marek12345
 dane dla nauczyciela: login: nauczyciel hasło: nauczyciel123
 
