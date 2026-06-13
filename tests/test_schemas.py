@@ -1,7 +1,13 @@
 import pytest
 from pydantic import ValidationError
 
-from schemas import LoginRequest, ChangePasswordRequest, UserCreate
+from schemas import (
+    ChangePasswordRequest,
+    ItemReminderRequest,
+    LoginRequest,
+    TeacherReserveForStudent,
+    UserCreate,
+)
 from models import UserRole
 
 
@@ -76,3 +82,19 @@ def test_user_create_first_name_too_short():
             first_name="J",
             last_name="Kowalski",
         )
+
+
+def test_teacher_reserve_for_student_valid():
+    data = TeacherReserveForStudent(
+        item_id=1,
+        user_id=2,
+        due_at="2026-06-20T12:00:00",
+    )
+
+    assert data.item_id == 1
+    assert data.user_id == 2
+
+
+def test_item_reminder_request_requires_item_ids():
+    with pytest.raises(ValidationError):
+        ItemReminderRequest(item_ids=[])

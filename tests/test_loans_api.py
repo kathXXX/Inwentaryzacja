@@ -54,6 +54,12 @@ def fake_teacher_user():
     )
 
 
+def future_period(days: int = 7):
+    starts_at = (datetime.utcnow() + timedelta(hours=1)).replace(microsecond=0)
+    due_at = starts_at + timedelta(days=days)
+    return starts_at.isoformat(), due_at.isoformat()
+
+
 client = TestClient(app)
 
 @pytest.fixture(autouse=True)
@@ -104,13 +110,17 @@ def create_item_and_loan(status=models.ItemStatus.dostepny, user_id=None):
 def test_request_loan_success():
     item_id, loan_id = create_item_and_loan()
 
-    due_at = (datetime.utcnow() + timedelta(days=7)).replace(microsecond=0).isoformat()
-    response = client.post("/loans/request/", json={"item_id": item_id, "due_at": due_at})
+    starts_at, due_at = future_period()
+    response = client.post(
+        "/loans/request/",
+        json={"item_id": item_id, "starts_at": starts_at, "due_at": due_at},
+    )
 
     assert response.status_code == 201
     assert response.json()["item_id"] == item_id
     assert response.json()["status"] == "zarezerwowany"
     assert response.json()["user_id"] == 1
+    assert response.json()["starts_at"].startswith(starts_at)
     assert response.json()["due_at"].startswith(due_at)
 
 
@@ -143,12 +153,17 @@ def test_list_pending_loans_empty():
 def test_list_pending_loans_after_request():
     item_id, loan_id = create_item_and_loan()
 
-    client.post("/loans/request/", json={"item_id": item_id})
+    starts_at, due_at = future_period()
+    client.post(
+        "/loans/request/",
+        json={"item_id": item_id, "starts_at": starts_at, "due_at": due_at},
+    )
     response = client.get("/loans/pending/")
 
     assert response.status_code == 200
     assert len(response.json()) == 1
     assert response.json()[0]["status"] == "zarezerwowany"
+    assert response.json()[0]["starts_at"].startswith(starts_at)
 
 
 def test_approve_loan_success():
@@ -157,12 +172,16 @@ def test_approve_loan_success():
         user_id=1,
     )
 
-    due_at = (datetime.utcnow() + timedelta(days=7)).replace(microsecond=0).isoformat()
-    response = client.post("/loans/approve/", json={"loan_id": loan_id, "due_at": due_at})
+    starts_at, due_at = future_period()
+    response = client.post(
+        "/loans/approve/",
+        json={"loan_id": loan_id, "starts_at": starts_at, "due_at": due_at},
+    )
 
     assert response.status_code == 200
     assert response.json()["status"] == "wypozyczony"
     assert response.json()["user_id"] == 1
+    assert response.json()["starts_at"].startswith(starts_at)
     assert response.json()["due_at"].startswith(due_at)
 
     db = TestingSessionLocal()
@@ -170,7 +189,42 @@ def test_approve_loan_success():
     db.close()
 
     assert history is not None
+    assert history.starts_at.isoformat().startswith(starts_at)
     assert history.due_at.isoformat().startswith(due_at)
+
+
+def test_reserve_for_student_success():
+    item_id, loan_id = create_item_and_loan()
+    starts_at, due_at = future_period()
+
+    db = TestingSessionLocal()
+    student = models.User(
+        id=10,
+        username="student10",
+        role=models.UserRole.student,
+        first_name="Student",
+        last_name="Test",
+        is_active=True,
+    )
+    db.add(student)
+    db.commit()
+    db.close()
+
+    response = client.post(
+        "/loans/reserve-for-student/",
+        json={
+            "item_id": item_id,
+            "user_id": 10,
+            "starts_at": starts_at,
+            "due_at": due_at,
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["status"] == "zarezerwowany"
+    assert response.json()["user_id"] == 10
+    assert response.json()["starts_at"].startswith(starts_at)
+    assert response.json()["due_at"].startswith(due_at)
 
 
 def test_approve_loan_not_found():
@@ -195,11 +249,17 @@ def test_approve_loan_wrong_status():
 def test_teacher_loan_success():
     item_id, loan_id = create_item_and_loan()
 
-    response = client.post("/loans/teacher/", json={"item_id": item_id})
+    starts_at, due_at = future_period()
+    response = client.post(
+        "/loans/teacher/",
+        json={"item_id": item_id, "starts_at": starts_at, "due_at": due_at},
+    )
 
     assert response.status_code == 201
     assert response.json()["status"] == "wypozyczony"
     assert response.json()["user_id"] == 2
+    assert response.json()["starts_at"].startswith(starts_at)
+    assert response.json()["due_at"].startswith(due_at)
 
 
 def test_teacher_loan_item_not_found():

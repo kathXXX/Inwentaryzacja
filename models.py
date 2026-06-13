@@ -94,6 +94,7 @@ class Loan(Base):
     item_id: Mapped[int] = mapped_column(Integer, ForeignKey('items.id'), unique=True)
     status: Mapped[ItemStatus] = mapped_column(Enum(ItemStatus), default=ItemStatus.dostepny)
     user_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey('users.id'), nullable=True)
+    starts_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     due_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     due_reminder_sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
@@ -110,6 +111,7 @@ class LoanHistory(Base):
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
 
     borrowed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    starts_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     due_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     returned_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 

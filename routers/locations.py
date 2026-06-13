@@ -53,6 +53,7 @@ def inventory_item_read(item: models.Item, scanned: bool = False) -> InventoryCh
         loan_id=loan.id if loan else None,
         status=loan.status if loan else ItemStatus.dostepny,
         user_id=loan.user_id if loan else None,
+        starts_at=loan.starts_at if loan else None,
         due_at=loan.due_at if loan else None,
         scanned=scanned,
     )

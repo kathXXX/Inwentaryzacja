@@ -26,6 +26,7 @@ async def get_item_status(item_id: int, db: db_dependency):
         kategoria=loan.item.kategoria if loan.item else None,
         lokalizacja=loan.item.lokalizacja if loan.item else None,
         status=loan.status,
+        starts_at=loan.starts_at,
         due_at=loan.due_at,
     )
 
@@ -46,6 +47,7 @@ async def list_availability(db: db_dependency):
             kategoria=loan.item.kategoria if loan.item else None,
             lokalizacja=loan.item.lokalizacja if loan.item else None,
             status=loan.status,
+            starts_at=loan.starts_at,
             due_at=loan.due_at,
         )
         for loan in loans
@@ -70,6 +72,7 @@ async def list_availability_details(
             item_name=loan.item.nazwa if loan.item else None,
             status=loan.status,
             user_id=loan.user_id,
+            starts_at=loan.starts_at,
             due_at=loan.due_at,
         )
         for loan in loans

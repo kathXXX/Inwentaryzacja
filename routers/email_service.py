@@ -67,9 +67,13 @@ async def send_loan_approved_email(
     to_email: str,
     user_name: str,
     item_name: str,
+    starts_at: str | None = None,
     due_at: str | None = None,
 ):
-    due_text = f"\nTermin zwrotu: {due_at}\n" if due_at else ""
+    period_text = ""
+    if starts_at or due_at:
+        period_text = f"\nTermin wypozyczenia: {starts_at or '-'} - {due_at or '-'}\n"
+
     await send_email(
         to_email,
         "Wypozyczenie zostalo zaakceptowane",
@@ -77,7 +81,7 @@ async def send_loan_approved_email(
 Czesc {user_name},
 
 Twoje wypozyczenie sprzetu "{item_name}" zostalo zaakceptowane.
-{due_text}
+{period_text}
 
 Mozesz odebrac sprzet zgodnie z ustaleniami w systemie inwentaryzacji.
 """
@@ -88,6 +92,7 @@ async def send_loan_due_reminder_email(
     to_email: str,
     user_name: str,
     item_name: str,
+    starts_at: str | None,
     due_at: str,
 ):
     await send_email(
@@ -96,7 +101,7 @@ async def send_loan_due_reminder_email(
         f"""
 Czesc {user_name},
 
-Przypominamy, ze sprzet "{item_name}" ma termin zwrotu: {due_at}.
+Przypominamy, ze sprzet "{item_name}" ma termin wypozyczenia: {starts_at or "-"} - {due_at}.
 
 Ta wiadomosc jest wysylana tylko do studenta, ktory wypozyczyl sprzet.
 """

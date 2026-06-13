@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -123,6 +125,68 @@ def test_delete_user_existing():
 
     check_response = client.get(f"/users/{user_id}")
     assert check_response.status_code == 404
+
+
+def test_delete_user_with_history_and_login_code():
+    user_id = create_test_user("student_with_history")
+
+    db = TestingSessionLocal()
+    item = models.Item(
+        nazwa="Laptop",
+        kategoria="Elektronika",
+        lokalizacja="Sala 101",
+        qr_code="QR-HISTORY",
+    )
+    db.add(item)
+    db.flush()
+    history = models.LoanHistory(item_id=item.id, user_id=user_id)
+    login_code = models.LoginCode(
+        challenge_id="challenge-history",
+        user_id=user_id,
+        code_hash="hash",
+        expires_at=datetime(2099, 1, 1),
+    )
+    db.add_all([history, login_code])
+    db.commit()
+    db.close()
+
+    response = client.delete(f"/users/{user_id}")
+
+    assert response.status_code == 204
+
+    db = TestingSessionLocal()
+    assert db.query(models.User).filter(models.User.id == user_id).first() is None
+    assert db.query(models.LoanHistory).filter(models.LoanHistory.user_id == user_id).count() == 0
+    assert db.query(models.LoginCode).filter(models.LoginCode.user_id == user_id).count() == 0
+    db.close()
+
+
+def test_delete_user_with_active_loan_is_blocked():
+    user_id = create_test_user("student_with_loan")
+
+    db = TestingSessionLocal()
+    item = models.Item(
+        nazwa="Projektor",
+        kategoria="Elektronika",
+        lokalizacja="Sala 102",
+        qr_code="QR-ACTIVE",
+    )
+    db.add(item)
+    db.flush()
+    db.add(
+        models.Loan(
+            item_id=item.id,
+            status=models.ItemStatus.wypozyczony,
+            user_id=user_id,
+        )
+    )
+    db.commit()
+    db.close()
+
+    response = client.delete(f"/users/{user_id}")
+
+    assert response.status_code == 400
+    assert "aktywne wypozyczenia" in response.json()["detail"]
 
 
 def test_delete_user_not_found():

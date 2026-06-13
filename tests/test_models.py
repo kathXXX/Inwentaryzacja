@@ -80,25 +80,36 @@ def test_loan_model_available_status():
 
 
 def test_loan_model_borrowed_status():
+    starts_at = datetime.utcnow()
+    due_at = starts_at + timedelta(days=7)
+
     loan = Loan(
         item_id=1,
         status=ItemStatus.wypozyczony,
         user_id=5,
+        starts_at=starts_at,
+        due_at=due_at,
     )
 
     assert loan.item_id == 1
     assert loan.status == ItemStatus.wypozyczony
     assert loan.user_id == 5
+    assert loan.starts_at == starts_at
+    assert loan.due_at == due_at
 
 
 def test_loan_history_model_fields():
     borrowed_at = datetime.utcnow()
+    starts_at = borrowed_at + timedelta(hours=1)
+    due_at = starts_at + timedelta(days=7)
     returned_at = borrowed_at + timedelta(days=1)
 
     history = LoanHistory(
         item_id=1,
         user_id=2,
         borrowed_at=borrowed_at,
+        starts_at=starts_at,
+        due_at=due_at,
         returned_at=returned_at,
         approved_by_id=3,
         returned_by_id=4,
@@ -107,6 +118,8 @@ def test_loan_history_model_fields():
     assert history.item_id == 1
     assert history.user_id == 2
     assert history.borrowed_at == borrowed_at
+    assert history.starts_at == starts_at
+    assert history.due_at == due_at
     assert history.returned_at == returned_at
     assert history.approved_by_id == 3
     assert history.returned_by_id == 4

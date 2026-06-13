@@ -106,6 +106,7 @@ class ItemQrRead(BaseModel):
     loan_id: Optional[int]
     status: ItemStatus
     user_id: Optional[int] = None
+    starts_at: Optional[datetime] = None
     due_at: Optional[datetime] = None
 
 
@@ -115,6 +116,7 @@ class LoanRead(BaseModel):
     item_name: Optional[str] = None
     status: ItemStatus
     user_id: Optional[int]
+    starts_at: Optional[datetime] = None
     due_at: Optional[datetime] = None
 
     class Config:
@@ -123,11 +125,13 @@ class LoanRead(BaseModel):
 
 class LoanRequest(BaseModel):
     item_id: int
+    starts_at: Optional[datetime] = None
     due_at: Optional[datetime] = None
 
 
 class LoanApprove(BaseModel):
     loan_id: int
+    starts_at: Optional[datetime] = None
     due_at: Optional[datetime] = None
 
 
@@ -137,7 +141,15 @@ class LoanReturn(BaseModel):
 
 class TeacherLoan(BaseModel):
     item_id: int
+    starts_at: Optional[datetime] = None
     due_at: Optional[datetime] = None
+
+
+class TeacherReserveForStudent(BaseModel):
+    item_id: int
+    user_id: int
+    starts_at: Optional[datetime] = None
+    due_at: datetime
 
 
 class AvailabilityRead(BaseModel):
@@ -147,6 +159,7 @@ class AvailabilityRead(BaseModel):
     kategoria: Optional[str] = None
     lokalizacja: Optional[str] = None
     status: ItemStatus
+    starts_at: Optional[datetime] = None
     due_at: Optional[datetime] = None
 
     class Config:
@@ -159,6 +172,7 @@ class LoanHistoryRead(BaseModel):
     user_id: int
     borrowed_at: datetime
     item_name: str | None = None
+    starts_at: Optional[datetime] = None
     due_at: Optional[datetime]
     returned_at: Optional[datetime]
     approved_by_id: Optional[int]
@@ -194,6 +208,7 @@ class InventoryCheckItem(BaseModel):
     loan_id: Optional[int] = None
     status: ItemStatus
     user_id: Optional[int] = None
+    starts_at: Optional[datetime] = None
     due_at: Optional[datetime] = None
     scanned: bool = False
 
@@ -219,6 +234,10 @@ class LocationInventoryCheckRead(BaseModel):
 
 class DueReminderRequest(BaseModel):
     days: int = Field(default=1, ge=0, le=30)
+
+
+class ItemReminderRequest(BaseModel):
+    item_ids: list[int] = Field(min_length=1, max_length=100)
 
 
 class DueReminderRead(BaseModel):

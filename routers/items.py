@@ -273,6 +273,7 @@ async def read_item_by_qr(qr_code: str, db: db_dependency):
         loan_id=loan.id,
         status=loan.status,
         user_id=loan.user_id,
+        starts_at=loan.starts_at,
         due_at=loan.due_at,
     )
 

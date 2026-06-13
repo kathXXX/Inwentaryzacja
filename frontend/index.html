@@ -90,7 +90,7 @@
       position: fixed;
       top: 1.2rem;
       right: 1.2rem;
-      z-index: 9999;
+      z-index: 10001;
       display: flex;
       flex-direction: column;
       gap: 0.5rem;
@@ -122,6 +122,51 @@
       background: rgba(79, 142, 247, 0.12);
       border-color: var(--primary);
       color: var(--primary);
+    }
+
+    .confirm-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      background: rgba(0, 0, 0, 0.68);
+    }
+
+    .confirm-dialog {
+      width: 100%;
+      max-width: 460px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem;
+      box-shadow: 0 18px 60px rgba(0, 0, 0, 0.5);
+    }
+
+    .confirm-dialog h4 {
+      margin-bottom: 0.55rem;
+    }
+
+    .confirm-message {
+      color: var(--text);
+      font-size: 0.95rem;
+      line-height: 1.45;
+      margin-bottom: 0.75rem;
+    }
+
+    .confirm-details {
+      padding: 0.75rem;
+      margin-bottom: 1rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface2);
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      line-height: 1.5;
+      overflow-wrap: anywhere;
     }
 
      .history-table-wrapper {
@@ -296,6 +341,13 @@
       font-size: 0.88rem;
       padding: 0.6rem 0.85rem;
       transition: border-color 0.2s;
+    }
+
+    input[type="checkbox"] {
+      width: auto;
+      min-width: 16px;
+      height: 16px;
+      accent-color: var(--primary);
     }
 
     input:focus,
@@ -860,23 +912,30 @@
             oninput="filterRows('searchAvailability', '#availTbody tr')"
           />
         </div>
+        <div class="row teacher-only" style="margin-bottom:0.9rem;">
+          <button class="btn btn-ghost" onclick="sendSelectedItemReminders()">
+            Wyślij przypomnienie dla zaznaczonych
+          </button>
+          <span id="selectedReminderCount" class="muted">Zaznaczono: 0</span>
+        </div>
         <div class="history-table-wrapper">
           <table>
             <thead>
               <tr>
+                <th class="teacher-only">Mail</th>
                 <th>ID</th>
                 <th>Nazwa</th>
                 <th>Kategoria</th>
                 <th>Lokalizacja</th>
                 <th>Status</th>
-                <th>Termin</th>
+                <th>Okres</th>
                 <th class="teacher-only">Użytkownik</th>
                 <th>Akcja</th>
               </tr>
             </thead>
             <tbody id="availTbody">
               <tr>
-                <td colspan="8" class="empty-state">Ładowanie…</td>
+                <td colspan="9" class="empty-state">Ładowanie…</td>
               </tr>
             </tbody>
           </table>
@@ -901,7 +960,15 @@
         </p>
         <div class="row">
           <input type="number" id="studentItemId" placeholder="ID przedmiotu" min="1" />
-          <label>Data zwrotu</label>
+          <label>Od kiedy</label>
+          <input
+            type="datetime-local"
+            id="studentStartsAt"
+            title="Data rozpoczęcia"
+            aria-label="Data rozpoczęcia"
+            onclick="this.showPicker && this.showPicker()"
+          />
+          <label>Do kiedy</label>
           <input
             type="datetime-local"
             id="studentDueAt"
@@ -943,8 +1010,14 @@
         <input type="number" id="teacherItemId" placeholder="ID przedmiotu" min="1" />
         <input
           type="datetime-local"
+          id="teacherStartsAt"
+          title="Od kiedy"
+          onclick="this.showPicker && this.showPicker()"
+        />
+        <input
+          type="datetime-local"
           id="teacherDueAt"
-          title="Termin zwrotu"
+          title="Do kiedy"
           onclick="this.showPicker && this.showPicker()"
         />
         <button class="btn btn-warning" onclick="teacherLoan()">Wypożycz dla siebie</button>
@@ -952,9 +1025,36 @@
 
       <hr class="div" />
 
+      <label style="margin-bottom:0.4rem;">Zarezerwuj przedmiot dla studenta</label>
+      <div class="row" style="margin-bottom:0.5rem;">
+        <input type="number" id="reserveItemId" placeholder="ID przedmiotu" min="1" />
+        <input type="number" id="reserveStudentId" placeholder="ID studenta" min="1" />
+        <input
+          type="datetime-local"
+          id="reserveStartsAt"
+          title="Od kiedy"
+          onclick="this.showPicker && this.showPicker()"
+        />
+        <input
+          type="datetime-local"
+          id="reserveDueAt"
+          title="Do kiedy"
+          onclick="this.showPicker && this.showPicker()"
+        />
+        <button class="btn btn-warning" onclick="reserveForStudent()">Zarezerwuj</button>
+      </div>
+
+      <hr class="div" />
+
       <label style="margin-bottom:0.4rem;">Zatwierdź wniosek studenta</label>
       <div class="row" style="margin-bottom:0.5rem;">
         <input type="number" id="approveLoanId" placeholder="Loan ID" min="1" autocomplete="off" />
+        <input
+          type="datetime-local"
+          id="approveStartsAt"
+          title="Nadpisz date rozpoczęcia"
+          onclick="this.showPicker && this.showPicker()"
+        />
         <input
           type="datetime-local"
           id="approveDueAt"
@@ -1019,7 +1119,7 @@
               <th>Przedmiot</th>
               <th>User ID</th>
               <th>Wypożyczono</th>
-              <th>Termin</th>
+              <th>Okres</th>
               <th>Zwrócono</th>
               <th>Zatwierdził</th>
               <th>Przyjął zwrot</th>
@@ -1062,7 +1162,17 @@
         </div>
         <hr class="div" />
         <div class="row">
-          <input type="number" id="delItemId" placeholder="ID przedmiotu do usunięcia" min="1" />
+          <input
+            type="text"
+            id="delItemPicker"
+            list="deleteItemsList"
+            placeholder="Wybierz przedmiot do usunięcia"
+            autocomplete="off"
+            oninput="syncDeleteItemPicker()"
+            onchange="syncDeleteItemPicker()"
+          />
+          <datalist id="deleteItemsList"></datalist>
+          <input type="hidden" id="delItemId" />
           <button class="btn btn-danger" onclick="deleteItem()">Usuń przedmiot</button>
         </div>
       </div>
@@ -1195,15 +1305,24 @@
     <div id="loanDueModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:9998;align-items:center;justify-content:center;padding:1rem;">
     <div class="section" style="width:100%;max-width:420px;margin:0;">
       <div class="section-header">
-        <h4>Podaj termin wypożyczenia</h4>
+      <h4>Podaj okres wypożyczenia</h4>
       </div>
 
       <p style="font-family:var(--mono);font-size:0.78rem;color:var(--muted);margin-bottom:0.9rem;">
-        Podaj do kiedy chcesz wypożyczyć przedmiot.
+        Podaj od kiedy i do kiedy chcesz wypożyczyć przedmiot.
       </p>
 
       <div class="field">
-        <label>Termin zwrotu</label>
+        <label>Od kiedy</label>
+        <input
+          type="datetime-local"
+          id="loanStartsModalInput"
+          onclick="this.showPicker && this.showPicker()"
+        />
+      </div>
+
+      <div class="field">
+        <label>Do kiedy</label>
         <input
           type="datetime-local"
           id="loanDueModalInput"
@@ -1214,6 +1333,17 @@
       <div class="row" style="justify-content:flex-end;">
         <button class="btn btn-ghost" type="button" onclick="closeLoanDueModal()">Anuluj</button>
         <button class="btn btn-warning" type="button" onclick="confirmLoanDueModal()">Wypożycz</button>
+      </div>
+    </div>
+  </div>
+  <div id="confirmModal" class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
+    <div class="confirm-dialog">
+      <h4 id="confirmModalTitle">Potwierdź akcję</h4>
+      <p id="confirmModalMessage" class="confirm-message"></p>
+      <div id="confirmModalDetails" class="confirm-details"></div>
+      <div class="row" style="justify-content:flex-end;">
+        <button class="btn btn-ghost" type="button" onclick="cancelConfirmModal()">Anuluj</button>
+        <button id="confirmModalConfirmBtn" class="btn btn-danger" type="button" onclick="confirmModalAccept()">Usuń</button>
       </div>
     </div>
   </div>
@@ -1243,8 +1373,10 @@
       loansRequest: `${BASE}/loans/request/`,
       loansApprove: `${BASE}/loans/approve/`,
       loansTeacher: `${BASE}/loans/teacher/`,
+      loansReserveForStudent: `${BASE}/loans/reserve-for-student/`,
       loansReturn: `${BASE}/loans/return/`,
       loansDueReminders: `${BASE}/loans/reminders/due/`,
+      loansItemReminders: `${BASE}/loans/reminders/items/`,
       users: `${BASE}/users/`,
       user: id => `${BASE}/users/${id}`,
       loansHistory: `${BASE}/loans/history/`
@@ -1260,54 +1392,106 @@
     let roomScanCodes = [];
     let pendingTeacherLoanItemId = null;
     let pendingStudentRequestItemId = null;
+    let selectedReminderItemIds = new Set();
+    let pendingConfirmAction = null;
+    let availabilityItemsCache = [];
+    let availabilityLoanMapCache = {};
+
+    function openConfirmModal({
+      title = "Potwierdź akcję",
+      message = "Czy na pewno chcesz kontynuować?",
+      details = "",
+      confirmText = "Potwierdź",
+      onConfirm
+    }) {
+      pendingConfirmAction = onConfirm;
+      document.getElementById("confirmModalTitle").textContent = title;
+      document.getElementById("confirmModalMessage").textContent = message;
+      document.getElementById("confirmModalDetails").textContent = details;
+      document.getElementById("confirmModalConfirmBtn").textContent = confirmText;
+      document.getElementById("confirmModal").style.display = "flex";
+      document.getElementById("confirmModalConfirmBtn").disabled = false;
+    }
+
+    function closeConfirmModal() {
+      pendingConfirmAction = null;
+      document.getElementById("confirmModal").style.display = "none";
+      document.getElementById("confirmModalConfirmBtn").disabled = false;
+    }
+
+    function cancelConfirmModal() {
+      closeConfirmModal();
+    }
+
+    async function confirmModalAccept() {
+      const action = pendingConfirmAction;
+      const btn = document.getElementById("confirmModalConfirmBtn");
+      if (!action) return closeConfirmModal();
+
+      btn.disabled = true;
+      try {
+        await action();
+        closeConfirmModal();
+      } catch (e) {
+        btn.disabled = false;
+      }
+    }
 
     function openLoanDueModal(itemId) {
       pendingTeacherLoanItemId = itemId;
 
+      const startsInput = document.getElementById("loanStartsModalInput");
       const input = document.getElementById("loanDueModalInput");
+      const startDate = new Date();
       const defaultDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
+      startsInput.value = startDate.toISOString().slice(0, 16);
       input.value = defaultDate.toISOString().slice(0, 16);
       document.getElementById("loanDueModal").style.display = "flex";
 
       setTimeout(() => {
-        input.focus();
-        if (input.showPicker) input.showPicker();
+        startsInput.focus();
+        if (startsInput.showPicker) startsInput.showPicker();
       }, 100);
     }
     function openStudentDueModal(itemId) {
       pendingStudentRequestItemId = itemId;
 
+      const startsInput = document.getElementById("loanStartsModalInput");
       const input = document.getElementById("loanDueModalInput");
+      const startDate = new Date();
       const defaultDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
+      startsInput.value = startDate.toISOString().slice(0, 16);
       input.value = defaultDate.toISOString().slice(0, 16);
       document.getElementById("loanDueModal").style.display = "flex";
 
       setTimeout(() => {
-        input.focus();
-        if (input.showPicker) input.showPicker();
+        startsInput.focus();
+        if (startsInput.showPicker) startsInput.showPicker();
       }, 100);
     }
 
     async function confirmLoanDueModal() {
-      const value = document.getElementById("loanDueModalInput").value;
+      const startsValue = document.getElementById("loanStartsModalInput").value;
+      const dueValue = document.getElementById("loanDueModalInput").value;
 
-      if (!value) return toast("Podaj termin zwrotu.", "error");
+      if (!startsValue || !dueValue) return toast("Podaj datę od i do.", "error");
 
-      const due_at = new Date(value).toISOString();
+      const starts_at = new Date(startsValue).toISOString();
+      const due_at = new Date(dueValue).toISOString();
 
       if (pendingTeacherLoanItemId) {
         const itemId = pendingTeacherLoanItemId;
         closeLoanDueModal();
-        await teacherLoanById(itemId, due_at);
+        await teacherLoanById(itemId, starts_at, due_at);
         return;
       }
 
       if (pendingStudentRequestItemId) {
         const itemId = pendingStudentRequestItemId;
         closeLoanDueModal();
-        await studentRequestById(itemId, due_at);
+        await studentRequestById(itemId, starts_at, due_at);
         return;
       }
 
@@ -1318,6 +1502,7 @@
       pendingTeacherLoanItemId = null;
       pendingStudentRequestItemId = null;
       document.getElementById("loanDueModal").style.display = "none";
+      document.getElementById("loanStartsModalInput").value = "";
       document.getElementById("loanDueModalInput").value = "";
     }
 
@@ -1791,10 +1976,61 @@
       return new Date(d).toLocaleString("pl-PL");
     }
 
+    function formatPeriod(startsAt, dueAt) {
+      if (!startsAt && !dueAt) return "—";
+      return `${formatDate(startsAt)} - ${formatDate(dueAt)}`;
+    }
+
     function localDateTimeToIso(id) {
       const value = document.getElementById(id)?.value;
       if (!value) return null;
       return new Date(value).toISOString();
+    }
+
+    function itemDeleteOptionLabel(item, loanMap = availabilityLoanMapCache) {
+      const status = loanMap[item.id]?.status || "dostepny";
+      return `#${item.id} - ${item.nazwa} - ${item.kategoria} - ${item.lokalizacja} - ${status}`;
+    }
+
+    function renderDeleteItemOptions(items = availabilityItemsCache, loanMap = availabilityLoanMapCache) {
+      const list = document.getElementById("deleteItemsList");
+      if (!list) return;
+
+      list.innerHTML = items
+        .map(item => `<option value="${escapeHtml(itemDeleteOptionLabel(item, loanMap))}"></option>`)
+        .join("");
+    }
+
+    function syncDeleteItemPicker() {
+      const picker = document.getElementById("delItemPicker");
+      const hidden = document.getElementById("delItemId");
+      if (!picker || !hidden) return null;
+
+      const value = picker.value.trim();
+      const exactItem = availabilityItemsCache.find(item => itemDeleteOptionLabel(item) === value);
+      const idFromLabel = value.match(/^#?(\d+)\b/);
+      const itemId = exactItem?.id || (idFromLabel ? parseInt(idFromLabel[1]) : null);
+
+      hidden.value = itemId || "";
+      return itemId;
+    }
+
+    function clearDeleteItemPicker() {
+      const picker = document.getElementById("delItemPicker");
+      const hidden = document.getElementById("delItemId");
+      if (picker) picker.value = "";
+      if (hidden) hidden.value = "";
+    }
+
+    function updateSelectedReminderCount() {
+      const el = document.getElementById("selectedReminderCount");
+      if (el) el.textContent = `Zaznaczono: ${selectedReminderItemIds.size}`;
+    }
+
+    function toggleReminderItem(itemId, checked) {
+      if (checked) selectedReminderItemIds.add(itemId);
+      else selectedReminderItemIds.delete(itemId);
+      updateSelectedReminderCount();
     }
 
     async function loadHistory() {
@@ -1815,7 +2051,7 @@
         <td>#${h.item_id}<br>${escapeHtml(h.item_name || "")}</td>
         <td><button class="btn btn-ghost btn-sm" onclick="showUserDetails(${h.user_id})">#${h.user_id}</button></td>
         <td>${formatDate(h.borrowed_at)}</td>
-        <td>${formatDate(h.due_at)}</td>
+        <td>${formatPeriod(h.starts_at, h.due_at)}</td>
         <td>${formatDate(h.returned_at)}</td>
         <td>${h.approved_by_id ? `<button class="btn btn-ghost btn-sm" onclick="showUserDetails(${h.approved_by_id})">#${h.approved_by_id}</button>` : "—"}</td>
 
@@ -1832,7 +2068,7 @@
     ════════════════════════════════════ */
     async function loadAvailability() {
       const tbody = document.getElementById("availTbody");
-      tbody.innerHTML = `<tr><td colspan="8" class="empty-state">Ładowanie…</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="9" class="empty-state">Ładowanie…</td></tr>`;
       try {
         const role = currentUser?.role || "student";
         const isPriv = role === "nauczyciel" || role === "administrator";
@@ -1847,9 +2083,12 @@
         const loanMap = {};
         loans.forEach(l => { loanMap[l.item_id] = l; });
 
+        availabilityItemsCache = items;
+        availabilityLoanMapCache = loanMap;
+        renderDeleteItemOptions(items, loanMap);
         renderAvailability(items, loanMap, isPriv);
       } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="8" class="empty-state" style="color:var(--danger);">${e.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" class="empty-state" style="color:var(--danger);">${e.message}</td></tr>`;
         toast("Błąd ładowania: " + e.message, "error");
       }
     }
@@ -1862,48 +2101,59 @@
     }
 
     function renderItemActions(itemId, loan = {}) {
-      const { isTeach, isStud } = roleFlags();
+      const { isAdmin, isTeach, isStud } = roleFlags();
       const status = loan?.status || "dostepny";
       const loanId = loan?.id || loan?.loan_id || null;
+      const actions = [];
 
       if (isStud && status === "dostepny") {
-        return `<div class="action-stack"><button class="btn btn-primary btn-sm" onclick="openStudentDueModal(${itemId})">Wniosek</button></div>`;
+        actions.push(`<button class="btn btn-primary btn-sm" onclick="openStudentDueModal(${itemId})">Wniosek</button>`);
       }
 
       if (isTeach && status === "dostepny") {
-        return `<div class="action-stack"><button class="btn btn-warning btn-sm" onclick="openLoanDueModal(${itemId})">Wypożycz</button></div>`;
+        actions.push(`<button class="btn btn-warning btn-sm" onclick="openLoanDueModal(${itemId})">Wypożycz</button>`);
       }
 
       if (isTeach && status === "zarezerwowany" && loanId) {
-        return `<div class="action-stack"><button class="btn btn-success btn-sm" onclick="approveLoanById(${loanId})">Zatwierdź</button></div>`;
+        actions.push(`<button class="btn btn-success btn-sm" onclick="approveLoanById(${loanId})">Zatwierdź</button>`);
       }
 
       if (isTeach && status === "wypozyczony" && loanId) {
-        return `<div class="action-stack"><button class="btn btn-ghost btn-sm" onclick="returnLoanById(${loanId})">Zwróć</button></div>`;
+        actions.push(`<button class="btn btn-ghost btn-sm" onclick="returnLoanById(${loanId})">Zwróć</button>`);
       }
 
-      return `<span class="muted">—</span>`;
+      if (isAdmin) {
+        actions.push(`<button class="btn btn-danger btn-sm" onclick="deleteItemById(${itemId})">Usuń</button>`);
+      }
+
+      return actions.length
+        ? `<div class="action-stack">${actions.join("")}</div>`
+        : `<span class="muted">—</span>`;
     }
 
     function renderAvailability(items, loanMap, showUser) {
       const tbody = document.getElementById("availTbody");
-      if (!items.length) { tbody.innerHTML = `<tr><td colspan="8" class="empty-state">Brak przedmiotów.</td></tr>`; return; }
+      if (!items.length) { tbody.innerHTML = `<tr><td colspan="9" class="empty-state">Brak przedmiotów.</td></tr>`; return; }
       tbody.innerHTML = items.map(item => {
         const loan = loanMap[item.id];
         const status = loan?.status || "dostepny";
         const uid = loan?.user_id || null;
         const highlighted = currentQrCode && item.qr_code === currentQrCode;
+        const reminderChecked = selectedReminderItemIds.has(item.id);
+        const canRemind = showUser && status === "wypozyczony" && uid;
         return `<tr data-item-id="${item.id}" class="${highlighted ? "qr-highlight" : ""}">
+      ${showUser ? `<td class="teacher-only">${canRemind ? `<input type="checkbox" ${reminderChecked ? "checked" : ""} onchange="toggleReminderItem(${item.id}, this.checked)" />` : "—"}</td>` : ""}
       <td>${item.id}</td>
       <td>${escapeHtml(item.nazwa)}</td>
       <td>${escapeHtml(item.kategoria)}</td>
       <td>${escapeHtml(item.lokalizacja)}</td>
       <td>${statusBadge(status)}</td>
-      <td>${formatDate(loan?.due_at)}</td>
+      <td>${formatPeriod(loan?.starts_at, loan?.due_at)}</td>
       ${showUser ? `<td>${uid ? `<button class="btn btn-ghost btn-sm" onclick="showUserDetails(${uid})">#${uid}</button>` : "—"}</td>` : ""}
       <td class="action-cell">${renderItemActions(item.id, loan)}</td>
     </tr>`;
       }).join("");
+      updateSelectedReminderCount();
     }
     async function showUserDetails(userId) {
       try {
@@ -1940,7 +2190,7 @@
         div.innerHTML = loans.map(l => `
       <div class="pending-row" style="display:flex;justify-content:space-between;align-items:center;padding:0.55rem 0;border-bottom:1px solid var(--border);">
         <span style="font-family:var(--mono);font-size:0.82rem;">
-          Loan <strong>#${l.id}</strong> · ${l.item_name || "Przedmiot #" + l.item_id} · User #${l.user_id} · Termin: ${formatDate(l.due_at)}
+          Loan <strong>#${l.id}</strong> · ${l.item_name || "Przedmiot #" + l.item_id} · User #${l.user_id} · ${formatPeriod(l.starts_at, l.due_at)}
         </span>
         <div style="display:flex;gap:8px;">
           <button class="btn btn-success btn-sm"
@@ -1962,18 +2212,20 @@
     ════════════════════════════════════ */
     async function studentRequest() {
       const item_id = parseInt(document.getElementById("studentItemId").value);
+      const starts_at = localDateTimeToIso("studentStartsAt");
       const due_at = localDateTimeToIso("studentDueAt");
       if (!item_id) return toast("Podaj ID przedmiotu.", "error");
-      if (!due_at) return toast("Podaj datę zwrotu.", "error");
-      await studentRequestById(item_id, due_at);
+      if (!starts_at || !due_at) return toast("Podaj datę od i do.", "error");
+      await studentRequestById(item_id, starts_at, due_at);
       document.getElementById("studentItemId").value = "";
+      document.getElementById("studentStartsAt").value = "";
       document.getElementById("studentDueAt").value = "";
     }
 
-    async function studentRequestById(item_id, due_at = null) {
+    async function studentRequestById(item_id, starts_at = null, due_at = null) {
       try {
         /* POST /loans/request/  { item_id }  →  LoanRead  (201) */
-        const loan = await api(R.loansRequest, { method: "POST", body: JSON.stringify({ item_id, due_at }) });
+        const loan = await api(R.loansRequest, { method: "POST", body: JSON.stringify({ item_id, starts_at, due_at }) });
         toast(`Wniosek złożony — Loan #${loan.id}. Czekaj na zatwierdzenie.`, "success");
         loadAvailability();
         refreshQrResult();
@@ -1985,34 +2237,23 @@
     ════════════════════════════════════ */
     async function teacherLoan() {
       const item_id = parseInt(document.getElementById("teacherItemId").value);
+      const starts_at = localDateTimeToIso("teacherStartsAt");
       const due_at = localDateTimeToIso("teacherDueAt");
       if (!item_id) return toast("Podaj ID przedmiotu.", "error");
-      await teacherLoanById(item_id, due_at);
+      if (!starts_at || !due_at) return toast("Podaj datę od i do.", "error");
+      await teacherLoanById(item_id, starts_at, due_at);
       document.getElementById("teacherItemId").value = "";
+      document.getElementById("teacherStartsAt").value = "";
       document.getElementById("teacherDueAt").value = "";
     }
 
-/*
-    async function confirmLoanDueModal() {
-        const value = document.getElementById("loanDueModalInput").value;
-
-        if (!pendingTeacherLoanItemId) return closeLoanDueModal();
-        if (!value) return toast("Podaj termin zwrotu.", "error");
-
-        const itemId = pendingTeacherLoanItemId;
-        const due_at = new Date(value).toISOString();
-
-        closeLoanDueModal();
-        await teacherLoanById(itemId, due_at);
-      }
-*/
-    async function teacherLoanById(item_id, due_at = null) {
-      if (!due_at) return openLoanDueModal(item_id);
+    async function teacherLoanById(item_id, starts_at = null, due_at = null) {
+      if (!starts_at || !due_at) return openLoanDueModal(item_id);
 
       try {
         const loan = await api(R.loansTeacher, {
           method: "POST",
-          body: JSON.stringify({ item_id, due_at })
+          body: JSON.stringify({ item_id, starts_at, due_at })
         });
 
         toast(`Wypożyczono — Loan #${loan.id}.`, "success");
@@ -2025,22 +2266,52 @@
         toast("Błąd: " + e.message, "error");
       }
     }
+
+    async function reserveForStudent() {
+      const item_id = parseInt(document.getElementById("reserveItemId").value);
+      const user_id = parseInt(document.getElementById("reserveStudentId").value);
+      const starts_at = localDateTimeToIso("reserveStartsAt");
+      const due_at = localDateTimeToIso("reserveDueAt");
+
+      if (!item_id) return toast("Podaj ID przedmiotu.", "error");
+      if (!user_id) return toast("Podaj ID studenta.", "error");
+      if (!starts_at || !due_at) return toast("Podaj datę od i do.", "error");
+
+      try {
+        const loan = await api(R.loansReserveForStudent, {
+          method: "POST",
+          body: JSON.stringify({ item_id, user_id, starts_at, due_at })
+        });
+
+        toast(`Zarezerwowano — Loan #${loan.id}.`, "success");
+        ["reserveItemId", "reserveStudentId", "reserveStartsAt", "reserveDueAt"].forEach(id => {
+          document.getElementById(id).value = "";
+        });
+        loadAvailability();
+        loadPending();
+      } catch (e) {
+        toast("Błąd rezerwacji: " + e.message, "error");
+      }
+    }
+
     /* ════════════════════════════════════
        TEACHER — approve
     ════════════════════════════════════ */
     async function approveLoan() {
       const loan_id = parseInt(document.getElementById("approveLoanId").value);
+      const starts_at = localDateTimeToIso("approveStartsAt");
       const due_at = localDateTimeToIso("approveDueAt");
       if (!loan_id) return toast("Podaj Loan ID.", "error");
-      await approveLoanById(loan_id, due_at);
+      await approveLoanById(loan_id, starts_at, due_at);
       document.getElementById("approveLoanId").value = "";
+      document.getElementById("approveStartsAt").value = "";
       document.getElementById("approveDueAt").value = "";
     }
 
-    async function approveLoanById(loan_id, due_at = null) {
+    async function approveLoanById(loan_id, starts_at = null, due_at = null) {
       try {
         /* POST /loans/approve/  { loan_id }  →  LoanRead  (200) */
-        await api(R.loansApprove, { method: "POST", body: JSON.stringify({ loan_id, due_at }) });
+        await api(R.loansApprove, { method: "POST", body: JSON.stringify({ loan_id, starts_at, due_at }) });
         toast(`Zatwierdzono Loan #${loan_id}.`, "success");
         loadAvailability(); loadPending(); loadHistory();
         refreshQrResult();
@@ -2048,23 +2319,34 @@
     }
 
     async function rejectLoan(loan_id) {
+      openConfirmModal({
+        title: "Odrzuć wniosek",
+        message: "Czy na pewno chcesz odrzucić ten wniosek?",
+        details: `Wniosek #${loan_id}`,
+        confirmText: "Odrzuć",
+        onConfirm: async () => {
+          try {
+            await api(`/api/loans/reject/`, {
+              method: "POST",
+              body: JSON.stringify({ loan_id })
+            });
 
-      if (!confirm(`Odrzucić wniosek #${loan_id}?`)) return;
+            toast(`Odrzucono wniosek #${loan_id}.`, "success");
+            loadPending();
+            loadAvailability();
+          } catch (e) {
+            toast("Błąd odrzucania: " + e.message, "error");
+            throw e;
+          }
+        }
+      });
+    }
 
-      try {
-        await api(`/api/loans/reject/`, {
-          method: "POST",
-          body: JSON.stringify({ loan_id })
-        });
-
-        toast(`Odrzucono wniosek #${loan_id}.`, "success");
-
-        loadPending();
-        loadAvailability();
-
-      } catch (e) {
-        toast("Błąd odrzucania: " + e.message, "error");
-      }
+    function toastReminderResult(data) {
+      const note = data.skipped
+        ? " Pominięte: brak aktywnego wypożyczenia studenta albo brak adresu e-mail."
+        : "";
+      toast(`Wysłano przypomnienia: ${data.sent}. Pominięto: ${data.skipped}.${note}`, data.sent ? "success" : "info");
     }
 
     async function sendDueReminders() {
@@ -2074,7 +2356,26 @@
           method: "POST",
           body: JSON.stringify({ days })
         });
-        toast(`Wysłano przypomnienia: ${data.sent}. Pominięto: ${data.skipped}.`, "success");
+        toastReminderResult(data);
+        loadAvailability();
+      } catch (e) {
+        toast("Błąd przypomnień: " + e.message, "error");
+      }
+    }
+
+    async function sendSelectedItemReminders() {
+      const item_ids = Array.from(selectedReminderItemIds);
+      if (!item_ids.length) return toast("Zaznacz przynajmniej jeden wypożyczony przedmiot.", "error");
+
+      try {
+        const data = await api(R.loansItemReminders, {
+          method: "POST",
+          body: JSON.stringify({ item_ids })
+        });
+
+        selectedReminderItemIds.clear();
+        updateSelectedReminderCount();
+        toastReminderResult(data);
         loadAvailability();
       } catch (e) {
         toast("Błąd przypomnień: " + e.message, "error");
@@ -2171,15 +2472,33 @@
     }
 
     async function deleteItem() {
-      const id = parseInt(document.getElementById("delItemId").value);
-      if (!id) return toast("Podaj ID przedmiotu.", "error");
-      if (!confirm(`Usunąć przedmiot #${id}?`)) return;
+      const id = syncDeleteItemPicker() || parseInt(document.getElementById("delItemId").value);
+      if (!id) return toast("Wybierz przedmiot z listy.", "error");
+      await deleteItemById(id);
+    }
+
+    async function deleteItemById(id) {
       try {
-        /* DELETE /items/{id}  →  204 */
-        await api(R.item(id), { method: "DELETE" });
-        toast(`Usunięto przedmiot #${id}.`, "success");
-        document.getElementById("delItemId").value = "";
-        loadAvailability();
+        const item = await api(R.item(id));
+        const description = `#${item.id}: ${item.nazwa}, ${item.kategoria}, ${item.lokalizacja}`;
+        openConfirmModal({
+          title: "Usuń przedmiot",
+          message: "Czy na pewno chcesz usunąć ten przedmiot?",
+          details: description,
+          confirmText: "Usuń",
+          onConfirm: async () => {
+            try {
+              /* DELETE /items/{id}  →  204 */
+              await api(R.item(id), { method: "DELETE" });
+              toast(`Usunięto przedmiot: ${item.nazwa} (#${id}).`, "success");
+              clearDeleteItemPicker();
+              loadAvailability();
+            } catch (e) {
+              toast("Błąd usuwania: " + e.message, "error");
+              throw e;
+            }
+          }
+        });
       } catch (e) { toast("Błąd usuwania: " + e.message, "error"); }
     }
 
@@ -2367,8 +2686,8 @@
         <span class="qr-value">${statusBadge(item.status)}</span>
       </div>
       <div class="qr-field">
-        <span class="qr-label">Termin zwrotu</span>
-        <span class="qr-value">${formatDate(item.due_at)}</span>
+        <span class="qr-label">Okres wypożyczenia</span>
+        <span class="qr-value">${formatPeriod(item.starts_at, item.due_at)}</span>
       </div>
       <div class="qr-field">
         <span class="qr-label">Użytkownik</span>
@@ -2656,17 +2975,32 @@
       const id = parseInt(document.getElementById("delUserId").value);
       if (!id) return toast("Podaj ID użytkownika.", "error");
       await deleteUserById(id);
-      document.getElementById("delUserId").value = "";
     }
 
     async function deleteUserById(id) {
       if (currentUser?.id === id) return toast("Nie możesz usunąć własnego konta.", "error");
-      if (!confirm(`Usunąć użytkownika #${id}?`)) return;
       try {
-        /* DELETE /users/{id}  →  204 */
-        await api(R.user(id), { method: "DELETE" });
-        toast(`Usunięto użytkownika #${id}.`, "success");
-        loadUsers();
+        const u = await api(R.user(id));
+        const description = `#${u.id}: ${u.first_name || "-"} ${u.last_name || "-"}, ${u.role}, ${u.email || "-"}`;
+        openConfirmModal({
+          title: "Usuń użytkownika",
+          message: "Czy na pewno chcesz usunąć tego użytkownika?",
+          details: description,
+          confirmText: "Usuń",
+          onConfirm: async () => {
+            try {
+              /* DELETE /users/{id}  →  204 */
+              await api(R.user(id), { method: "DELETE" });
+              toast(`Usunięto użytkownika: ${u.first_name || ""} ${u.last_name || ""} (#${id}).`, "success");
+              const delInput = document.getElementById("delUserId");
+              if (parseInt(delInput.value) === id) delInput.value = "";
+              loadUsers();
+            } catch (e) {
+              toast("Błąd: " + e.message, "error");
+              throw e;
+            }
+          }
+        });
       } catch (e) { toast("Błąd: " + e.message, "error"); }
     }
 
@@ -2682,29 +3016,22 @@
     });
 
     // Kalendarz
-    flatpickr("#teacherDueAt", {
+    [
+      "#studentStartsAt",
+      "#studentDueAt",
+      "#teacherStartsAt",
+      "#teacherDueAt",
+      "#reserveStartsAt",
+      "#reserveDueAt",
+      "#approveStartsAt",
+      "#approveDueAt",
+      "#loanStartsModalInput",
+      "#loanDueModalInput"
+    ].forEach(selector => flatpickr(selector, {
         enableTime: true,
         dateFormat: "Y-m-d H:i",
         time_24hr: true
-    });
-
-    flatpickr("#approveDueAt", {
-        enableTime: true,
-        dateFormat: "Y-m-d H:i",
-        time_24hr: true
-    });
-
-    flatpickr("#loanDueModalInput", {
-        enableTime: true,
-        dateFormat: "Y-m-d H:i",
-        time_24hr: true
-    });
-
-    flatpickr("#studentDueAt", {
-      enableTime: true,
-      dateFormat: "Y-m-d H:i",
-      time_24hr: true
-    });
+    }));
 
   </script>
 </body>

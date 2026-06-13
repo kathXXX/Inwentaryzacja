@@ -4,17 +4,19 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 
 import models
 from database import db_dependency
-from models import ItemStatus
+from models import ItemStatus, UserRole
 from routers.email_service import send_loan_approved_email, send_loan_due_reminder_email
 from schemas import (
     DueReminderRead,
     DueReminderRequest,
+    ItemReminderRequest,
     LoanApprove,
     LoanHistoryRead,
     LoanRead,
     LoanRequest,
     LoanReturn,
     TeacherLoan,
+    TeacherReserveForStudent,
 )
 from security import require_student, require_teacher
 
@@ -22,23 +24,48 @@ from security import require_student, require_teacher
 router = APIRouter(prefix="/loans", tags=["Wypozyczenia"])
 
 
-def normalize_due_at(due_at: datetime | None) -> datetime | None:
-    if due_at and due_at.tzinfo:
-        return due_at.astimezone(timezone.utc).replace(tzinfo=None)
-    return due_at
+def normalize_datetime(value: datetime | None) -> datetime | None:
+    if value and value.tzinfo:
+        return value.astimezone(timezone.utc).replace(tzinfo=None)
+    return value
 
 
-def validate_due_at(due_at: datetime | None) -> datetime | None:
-    due_at = normalize_due_at(due_at)
-    if due_at and due_at <= datetime.utcnow():
-        raise HTTPException(status_code=400, detail="Termin zwrotu musi byc w przyszlosci")
-    return due_at
+def resolve_loan_period(
+    starts_at: datetime | None,
+    due_at: datetime | None,
+    *,
+    existing_starts_at: datetime | None = None,
+    existing_due_at: datetime | None = None,
+    require_due_at: bool = True,
+) -> tuple[datetime, datetime | None]:
+    start = normalize_datetime(starts_at) or existing_starts_at or datetime.utcnow()
+    due = normalize_datetime(due_at) or existing_due_at
+
+    if require_due_at and not due:
+        raise HTTPException(status_code=400, detail="Podaj date zwrotu")
+
+    if due and due <= start:
+        raise HTTPException(status_code=400, detail="Data zwrotu musi byc po dacie rozpoczecia")
+
+    return start, due
 
 
-def format_due_at(due_at: datetime | None) -> str | None:
-    if not due_at:
+def format_date(value: datetime | None) -> str | None:
+    if not value:
         return None
-    return due_at.strftime("%d.%m.%Y %H:%M")
+    return value.strftime("%d.%m.%Y %H:%M")
+
+
+def loan_to_read(loan: models.Loan) -> LoanRead:
+    return LoanRead(
+        id=loan.id,
+        item_id=loan.item_id,
+        item_name=loan.item.nazwa if loan.item else None,
+        status=loan.status,
+        user_id=loan.user_id,
+        starts_at=loan.starts_at,
+        due_at=loan.due_at,
+    )
 
 
 @router.get(
@@ -51,18 +78,7 @@ async def list_pending_loans(
     current_user: models.User = Depends(require_teacher),
 ):
     loans = db.query(models.Loan).filter(models.Loan.status == ItemStatus.zarezerwowany).all()
-
-    return [
-        LoanRead(
-            id=loan.id,
-            item_id=loan.item_id,
-            item_name=loan.item.nazwa if loan.item else None,
-            status=loan.status,
-            user_id=loan.user_id,
-            due_at=loan.due_at,
-        )
-        for loan in loans
-    ]
+    return [loan_to_read(loan) for loan in loans]
 
 
 @router.post(
@@ -76,7 +92,41 @@ async def request_loan(
     db: db_dependency,
     current_user: models.User = Depends(require_student),
 ):
-    due_at = validate_due_at(req.due_at)
+    loan = db.query(models.Loan).filter(models.Loan.item_id == req.item_id).first()
+    if not loan:
+        raise HTTPException(status_code=404, detail="Przedmiot nie znaleziony")
+    if loan.status.value != ItemStatus.dostepny.value:
+        raise HTTPException(status_code=400, detail=f"Przedmiot jest obecnie: {loan.status}")
+
+    starts_at, due_at = resolve_loan_period(req.starts_at, req.due_at)
+
+    loan.status = ItemStatus.zarezerwowany
+    loan.user_id = current_user.id
+    loan.starts_at = starts_at
+    loan.due_at = due_at
+    loan.due_reminder_sent_at = None
+
+    db.commit()
+    db.refresh(loan)
+    return loan_to_read(loan)
+
+
+@router.post(
+    "/reserve-for-student/",
+    status_code=status.HTTP_201_CREATED,
+    response_model=LoanRead,
+    summary="Zarezerwuj sprzet dla studenta [nauczyciel/admin]",
+)
+async def reserve_for_student(
+    req: TeacherReserveForStudent,
+    db: db_dependency,
+    current_user: models.User = Depends(require_teacher),
+):
+    student = db.query(models.User).filter(models.User.id == req.user_id).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student nie znaleziony")
+    if student.role != UserRole.student:
+        raise HTTPException(status_code=400, detail="Rezerwacje mozna zrobic tylko dla studenta")
 
     loan = db.query(models.Loan).filter(models.Loan.item_id == req.item_id).first()
     if not loan:
@@ -84,13 +134,17 @@ async def request_loan(
     if loan.status.value != ItemStatus.dostepny.value:
         raise HTTPException(status_code=400, detail=f"Przedmiot jest obecnie: {loan.status}")
 
+    starts_at, due_at = resolve_loan_period(req.starts_at, req.due_at)
+
     loan.status = ItemStatus.zarezerwowany
-    loan.user_id = current_user.id
+    loan.user_id = student.id
+    loan.starts_at = starts_at
     loan.due_at = due_at
     loan.due_reminder_sent_at = None
+
     db.commit()
     db.refresh(loan)
-    return loan
+    return loan_to_read(loan)
 
 
 @router.post(
@@ -109,17 +163,26 @@ async def approve_loan(
         raise HTTPException(status_code=404, detail="Wniosek nie znaleziony")
     if loan.status.value != ItemStatus.zarezerwowany.value:
         raise HTTPException(status_code=400, detail="Mozna zatwierdzic tylko wnioski zarezerwowane")
+    if not loan.user_id:
+        raise HTTPException(status_code=400, detail="Wniosek nie ma przypisanego uzytkownika")
 
-    due_at = validate_due_at(req.due_at)
-    if due_at:
-        loan.due_at = due_at
+    starts_at, due_at = resolve_loan_period(
+        req.starts_at,
+        req.due_at,
+        existing_starts_at=loan.starts_at,
+        existing_due_at=loan.due_at,
+    )
 
+    loan.starts_at = starts_at
+    loan.due_at = due_at
     loan.status = ItemStatus.wypozyczony
+
     history = models.LoanHistory(
         item_id=loan.item_id,
         user_id=loan.user_id,
-        approved_by_id=current_user.id,
+        starts_at=loan.starts_at,
         due_at=loan.due_at,
+        approved_by_id=current_user.id,
     )
 
     db.add(history)
@@ -132,10 +195,11 @@ async def approve_loan(
             loan.user.email,
             f"{loan.user.first_name} {loan.user.last_name}",
             loan.item.nazwa,
-            format_due_at(loan.due_at),
+            format_date(loan.starts_at),
+            format_date(loan.due_at),
         )
 
-    return loan
+    return loan_to_read(loan)
 
 
 @router.post(
@@ -149,29 +213,32 @@ async def teacher_loan(
     db: db_dependency,
     current_user: models.User = Depends(require_teacher),
 ):
-    due_at = validate_due_at(req.due_at)
-
     loan = db.query(models.Loan).filter(models.Loan.item_id == req.item_id).first()
     if not loan:
         raise HTTPException(status_code=404, detail="Przedmiot nie znaleziony")
     if loan.status.value != ItemStatus.dostepny.value:
         raise HTTPException(status_code=400, detail=f"Przedmiot jest obecnie: {loan.status}")
 
+    starts_at, due_at = resolve_loan_period(req.starts_at, req.due_at)
+
     loan.status = ItemStatus.wypozyczony
     loan.user_id = current_user.id
+    loan.starts_at = starts_at
     loan.due_at = due_at
     loan.due_reminder_sent_at = None
+
     history = models.LoanHistory(
         item_id=loan.item_id,
         user_id=current_user.id,
-        approved_by_id=current_user.id,
+        starts_at=loan.starts_at,
         due_at=loan.due_at,
+        approved_by_id=current_user.id,
     )
 
     db.add(history)
     db.commit()
     db.refresh(loan)
-    return loan
+    return loan_to_read(loan)
 
 
 @router.post(
@@ -189,6 +256,8 @@ async def return_loan(
         raise HTTPException(status_code=404, detail="Wniosek nie znaleziony")
     if loan.status.value == ItemStatus.dostepny.value:
         raise HTTPException(status_code=400, detail="Przedmiot jest juz dostepny")
+    if not loan.user_id:
+        raise HTTPException(status_code=400, detail="Wypozyczenie nie ma przypisanego uzytkownika")
 
     history = (
         db.query(models.LoanHistory)
@@ -197,34 +266,35 @@ async def return_loan(
             models.LoanHistory.user_id == loan.user_id,
             models.LoanHistory.returned_at == None,
         )
-        .borrowed_at.desc.order_by(models.LoanHistory())
+        .order_by(models.LoanHistory.borrowed_at.desc())
         .first()
     )
 
     now = datetime.utcnow()
-
-    if not history:
+    if history:
+        history.returned_at = now
+        history.returned_by_id = current_user.id
+    else:
         history = models.LoanHistory(
             item_id=loan.item_id,
             user_id=loan.user_id,
-            borrowed_at=loan.borrowed_at if hasattr(loan, "borrowed_at") else now,
+            borrowed_at=now,
+            starts_at=loan.starts_at,
             due_at=loan.due_at,
             returned_at=now,
             returned_by_id=current_user.id,
         )
         db.add(history)
-    else:
-        history.returned_at = now
-        history.returned_by_id = current_user.id
-        
+
     loan.status = ItemStatus.dostepny
     loan.user_id = None
+    loan.starts_at = None
     loan.due_at = None
     loan.due_reminder_sent_at = None
-    
+
     db.commit()
     db.refresh(loan)
-    return loan
+    return loan_to_read(loan)
 
 
 @router.get(
@@ -236,9 +306,7 @@ async def loan_history(
     db: db_dependency,
     current_user: models.User = Depends(require_teacher),
 ):
-
     histories = db.query(models.LoanHistory).order_by(models.LoanHistory.borrowed_at.desc()).all()
-
     return [
         LoanHistoryRead(
             id=h.id,
@@ -246,6 +314,7 @@ async def loan_history(
             item_name=h.item.nazwa if h.item else None,
             user_id=h.user_id,
             borrowed_at=h.borrowed_at,
+            starts_at=h.starts_at,
             due_at=h.due_at,
             returned_at=h.returned_at,
             approved_by_id=h.approved_by_id,
@@ -277,14 +346,13 @@ async def send_due_reminders(
             models.Loan.due_at != None,
             models.Loan.due_at <= until,
             models.Loan.due_reminder_sent_at == None,
-            models.User.role == models.UserRole.student,
+            models.User.role == UserRole.student,
         )
         .all()
     )
 
     sent = 0
     skipped = 0
-
     for loan in loans:
         if not loan.user or not loan.user.email or not loan.item or not loan.due_at:
             skipped += 1
@@ -295,14 +363,62 @@ async def send_due_reminders(
             loan.user.email,
             f"{loan.user.first_name} {loan.user.last_name}",
             loan.item.nazwa,
-            format_due_at(loan.due_at) or "",
+            format_date(loan.starts_at),
+            format_date(loan.due_at) or "",
         )
         loan.due_reminder_sent_at = now
         sent += 1
 
     db.commit()
-
     return DueReminderRead(sent=sent, skipped=skipped)
+
+
+@router.post(
+    "/reminders/items/",
+    response_model=DueReminderRead,
+    summary="Wyslij przypomnienia dla zaznaczonych przedmiotow [nauczyciel/admin]",
+)
+async def send_item_reminders(
+    req: ItemReminderRequest,
+    background_tasks: BackgroundTasks,
+    db: db_dependency,
+    current_user: models.User = Depends(require_teacher),
+):
+    item_ids = list(dict.fromkeys(req.item_ids))
+    loans = (
+        db.query(models.Loan)
+        .join(models.User, models.Loan.user_id == models.User.id)
+        .filter(
+            models.Loan.item_id.in_(item_ids),
+            models.Loan.status == ItemStatus.wypozyczony,
+            models.User.role == UserRole.student,
+        )
+        .all()
+    )
+
+    now = datetime.utcnow()
+    sent = 0
+    skipped = len(item_ids) - len({loan.item_id for loan in loans})
+
+    for loan in loans:
+        if not loan.user or not loan.user.email or not loan.item:
+            skipped += 1
+            continue
+
+        background_tasks.add_task(
+            send_loan_due_reminder_email,
+            loan.user.email,
+            f"{loan.user.first_name} {loan.user.last_name}",
+            loan.item.nazwa,
+            format_date(loan.starts_at),
+            format_date(loan.due_at) or "",
+        )
+        loan.due_reminder_sent_at = now
+        sent += 1
+
+    db.commit()
+    return DueReminderRead(sent=sent, skipped=skipped)
+
 
 @router.post("/reject/")
 async def reject_loan(
@@ -310,29 +426,18 @@ async def reject_loan(
     db: db_dependency,
     current_user: models.User = Depends(require_teacher),
 ):
-    loan = (
-        db.query(models.Loan)
-        .filter(models.Loan.id == req.loan_id)
-        .first()
-    )
-
+    loan = db.query(models.Loan).filter(models.Loan.id == req.loan_id).first()
     if not loan:
-        raise HTTPException(404, "Wniosek nie istnieje")
-
+        raise HTTPException(status_code=404, detail="Wniosek nie istnieje")
     if loan.status != ItemStatus.zarezerwowany:
-        raise HTTPException(
-            status_code=400,
-            detail="Mozna odrzucic tylko wniosek oczekujacy"
-        )
+        raise HTTPException(status_code=400, detail="Mozna odrzucic tylko wniosek oczekujacy")
 
     loan.status = ItemStatus.dostepny
     loan.user_id = None
+    loan.starts_at = None
     loan.due_at = None
     loan.due_reminder_sent_at = None
 
     db.commit()
     db.refresh(loan)
-
-    return {
-        "message": "Wniosek odrzucony"
-    }
+    return {"message": "Wniosek odrzucony"}

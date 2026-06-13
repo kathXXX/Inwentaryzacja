@@ -123,8 +123,57 @@ async def delete_user(
     if db_user.id == current_user.id:
         raise HTTPException(status_code=400, detail="Nie mozesz usunac samego siebie")
 
+    active_loans = (
+        db.query(models.Loan)
+        .filter(
+            models.Loan.user_id == user_id,
+            models.Loan.status != models.ItemStatus.dostepny,
+        )
+        .all()
+    )
+    if active_loans:
+        item_ids = ", ".join(f"#{loan.item_id}" for loan in active_loans[:5])
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Nie mozna usunac uzytkownika, bo ma aktywne wypozyczenia "
+                f"lub rezerwacje: {item_ids}. Najpierw zwroc albo odrzuc te wypozyczenia."
+            ),
+        )
+
+    db.query(models.LoginCode).filter(models.LoginCode.user_id == user_id).delete(
+        synchronize_session=False
+    )
+    db.query(models.Loan).filter(models.Loan.user_id == user_id).update(
+        {
+            models.Loan.user_id: None,
+            models.Loan.starts_at: None,
+            models.Loan.due_at: None,
+            models.Loan.due_reminder_sent_at: None,
+        },
+        synchronize_session=False,
+    )
+    db.query(models.LoanHistory).filter(models.LoanHistory.approved_by_id == user_id).update(
+        {models.LoanHistory.approved_by_id: None},
+        synchronize_session=False,
+    )
+    db.query(models.LoanHistory).filter(models.LoanHistory.returned_by_id == user_id).update(
+        {models.LoanHistory.returned_by_id: None},
+        synchronize_session=False,
+    )
+    db.query(models.LoanHistory).filter(models.LoanHistory.user_id == user_id).delete(
+        synchronize_session=False
+    )
+
     db.delete(db_user)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail="Nie mozna usunac uzytkownika, bo ma powiazane dane w systemie",
+        )
 
 
 
